@@ -1,0 +1,304 @@
+version: '3.8'
+
+services:
+  ocr_service:
+    build:
+      context: ./services/ocr_service
+      dockerfile: Dockerfile
+    container_name: ocr_service
+    ports:
+      - "${OCR_PORT:-8001}:${OCR_PORT:-8001}"
+    env_file:
+      - .env
+    volumes:
+      - ./services/ocr_service:/paddle
+      - ./services/ocr_service/data:/root/.paddlex/ # OCR 模型缓存
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${OCR_PORT:-8001}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  embedding_service:
+    build:
+      context: ./services/embedding_service
+      dockerfile: Dockerfile
+    container_name: embedding_service
+    ports:
+      - "${EMBEDDING_PORT:-8002}:${EMBEDDING_PORT:-8002}"
+    env_file:
+      - .env
+    volumes:
+      - ./services/embedding_service/data:/app/models # Embedding 模型缓存
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+
+  rerank_service:
+    build:
+      context: ./services/rerank_service
+      dockerfile: Dockerfile
+    container_name: rerank_service
+    ports:
+      - "${RERANK_PORT:-8003}:${RERANK_PORT:-8003}"
+    env_file:
+      - .env
+    volumes:
+      - ./services/rerank_service/data:/app/models # Rerank 模型缓存
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+
+  websearch_service:
+    build:
+      context: ./services/websearch_service
+      dockerfile: Dockerfile
+    container_name: websearch_service
+    ports:
+      - "${SEARCH_SERVICE_PORT:-8004}:${SEARCH_SERVICE_PORT:-8004}"
+    env_file:
+      - .env
+    environment:
+      - PGSQL_HOST=pgsql_service # 使用容器名连接数据库
+      - PGSQL_PORT=5432 # 容器内部通信端口（固定）
+      - MILVUS_HOST=milvus # 向量数据库
+      - MILVUS_PORT=19530
+      - EMBEDDING_HOST=embedding_service # Embedding 服务
+    volumes:
+      - ./services/websearch_service:/app
+      - ./storage:/app/storage
+      - ./services:/app/services
+    restart: unless-stopped
+    shm_size: '2gb'
+    depends_on:
+      - searxng
+      - pgsql
+      - milvus
+      - embedding_service
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${SEARCH_SERVICE_PORT:-8004}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  rag_service:
+    build:
+      context: ./services/rag_service
+      dockerfile: Dockerfile
+    container_name: rag_service
+    ports:
+      - "${RAG_SERVICE_PORT:-8008}:${RAG_SERVICE_PORT:-8008}"
+    env_file:
+      - .env
+    environment:
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+      - EMBEDDING_HOST=embedding_service
+      - EMBEDDING_PORT=8002
+      - RERANK_HOST=rerank_service
+      - RERANK_PORT=8003
+    volumes:
+      - ./services/rag_service:/app
+    restart: unless-stopped
+    depends_on:
+      - milvus
+      - embedding_service
+      - rerank_service
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${RAG_SERVICE_PORT:-8008}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  deepsearch_service:
+    build:
+      context: ./services/deepsearch_service
+      dockerfile: Dockerfile
+    container_name: deepsearch_service
+    ports:
+      - "${DEEPSEARCH_SERVICE_PORT:-8007}:${DEEPSEARCH_SERVICE_PORT:-8007}"
+    env_file:
+      - .env
+    environment:
+      - SEARCH_SERVICE_HOST=websearch_service # 使用容器名连接 WebSearch
+      - RAG_HOST=rag_service # RAG 检索服务
+      - RAG_SERVICE_PORT=8008
+    volumes:
+      - ./services/deepsearch_service:/app
+    restart: unless-stopped
+    depends_on:
+      - websearch_service
+      - rag_service
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${DEEPSEARCH_SERVICE_PORT:-8007}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  sandbox_service:
+    build:
+      context: ./services/sandbox_service
+      dockerfile: Dockerfile
+    container_name: sandbox_service
+    ports:
+      - "${SANDBOX_SERVICE_PORT:-8010}:${SANDBOX_SERVICE_PORT:-8010}"
+    env_file:
+      - .env
+    environment:
+      # 信任模式下容器挂载路径（宿主机绝对路径）
+      - SERVICES_MOUNT_PATH=${PWD}/services
+      - ENV_FILE_PATH=${PWD}/.env
+    volumes:
+      - ./services/sandbox_service:/app
+      - ./services:/app/services # 挂载 services 供信任模式使用
+      - ./.env:/app/.env:ro # 挂载环境变量文件
+      - /var/run/docker.sock:/var/run/docker.sock # Docker-in-Docker
+    group_add:
+      - "999" # docker 组 GID，用于访问 docker.sock
+    restart: unless-stopped
+    privileged: false
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${SANDBOX_SERVICE_PORT:-8010}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  pgsql:
+    build:
+      context: ./storage/pgsql
+      dockerfile: Dockerfile
+    container_name: pgsql_service
+    ports:
+      - "${PGSQL_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_USER=${PGSQL_USER:-postgres}
+      - POSTGRES_PASSWORD=${PGSQL_PASSWORD:-postgres123}
+      - POSTGRES_DB=${PGSQL_DATABASE:-myagent}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ./storage/pgsql/data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${PGSQL_USER:-postgres}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  milvus:
+    build:
+      context: ./storage/milvus
+      dockerfile: Dockerfile
+    container_name: milvus
+    ports:
+      - "${MILVUS_PORT:-19530}:19530"
+    volumes:
+      - ./storage/milvus/data:/var/lib/milvus/data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "ls", "/var/lib/milvus/data" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: searxng_service
+    ports:
+      - "${SEARXNG_PORT:-8005}:8080"
+    volumes:
+      - ./services/websearch_service/searxng/config:/etc/searxng
+      - ./services/websearch_service/searxng/data:/var/cache/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:${SEARXNG_PORT:-8005}/
+      - SEARXNG_LIMITER=${SEARXNG_LIMITER:-false}
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ==================== Apps ====================
+  chat:
+    build:
+      context: .
+      dockerfile: app/chat/Dockerfile
+    container_name: chat_app
+    ports:
+      - "${CHAT_SERVICE_PORT:-8006}:${CHAT_SERVICE_PORT:-8006}"
+    env_file:
+      - .env
+    environment:
+      - PGSQL_HOST=pgsql_service # 使用容器名连接数据库
+      - PGSQL_PORT=5432 # 容器内部通信端口（固定）
+      - OCR_HOST=ocr_service # 使用容器名连接 OCR 服务
+    restart: unless-stopped
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${CHAT_SERVICE_PORT:-8006}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Agent 智能体服务
+  agent:
+    build:
+      context: .
+      dockerfile: app/agent/Dockerfile
+    container_name: agent_app
+    ports:
+      - "${AGENT_SERVICE_PORT:-8020}:${AGENT_SERVICE_PORT:-8020}"
+    env_file:
+      - .env
+    environment:
+      - PGSQL_HOST=pgsql_service
+      - PGSQL_PORT=5432
+      - SANDBOX_SERVICE_HOST=sandbox_service
+      - SEARCH_SERVICE_HOST=websearch_service
+      - DEEPSEARCH_SERVICE_HOST=deepsearch_service
+      - RAG_HOST=rag_service
+      - EMBEDDING_HOST=embedding_service
+      - RERANK_HOST=rerank_service
+    volumes:
+      - ./app/agent:/app/app/agent
+      - ./services:/app/services
+      - ./storage:/app/storage
+    restart: unless-stopped
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      sandbox_service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${AGENT_SERVICE_PORT:-8020}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  default:
+    name: myagent_network
+    external: true
