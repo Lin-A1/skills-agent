@@ -10,7 +10,7 @@ MyAgent 是一个基于动态**技能架构（Skill Architecture）**构建的**
 
 ## 🚀 核心概念：技能智能体 (Skill Agent)
 
-在 MyAgent 中，**技能（Skill）**是智能体能力的原子单位。
+在 MyAgent 中， **技能（Skill）** 是智能体能力的原子单位。
 
 ### 1. 协议 (SKILL.md)
 每个技能由一个 Markdown 文件定义，具有双重用途：
