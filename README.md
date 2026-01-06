@@ -135,6 +135,7 @@ The frontend needs to be started in the development environment:
 
 - [ ] **File Operation Service** (`file_service`): Capability to create, read, update, and delete files.
 - [ ] **Agent Workspace**: Dedicated file operation space (Current Session Folder) allowing the Agent to manipulate files like an AI IDE.
+- [ ] **Todo Management**: A skill to manage tasks and to-do lists.
 
 ---
 

@@ -8,6 +8,7 @@ import logging
 import re
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional
+from datetime import datetime
 
 from ..config import settings
 from ..schemas.agent import AgentEvent, AgentEventType, StepResult, ToolAction
@@ -401,7 +402,8 @@ class ReActEngine:
         
         return AGENT_SYSTEM_PROMPT.format(
             available_tools=tools_text,
-            context=context_text
+            context=context_text,
+            current_date=datetime.now().strftime("%Y-%m-%d")
         )
     
     def _format_context(self, context: Dict[str, Any]) -> str:
