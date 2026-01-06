@@ -1,4 +1,4 @@
-[English](./README.md) | **中文版**
+[English](../README.md) | **中文版**
 
 # MyAgent: 基于技能构建的通用智能体框架
 
@@ -81,7 +81,7 @@ myagent/
 
 1.  **克隆仓库**
     ```bash
-    git clone https://github.com/your-username/myagent.git
+    git clone https://github.com/Lin-A1/myagent.git
     cd myagent
     ```
 
@@ -130,6 +130,13 @@ myagent/
 3.  **实现客户端**：在 `client.py` 中创建 `MyNewSkillClient` 类。
 4.  **重启**：智能体将自动检测到 `my_new_skill`。
 
+
+## 📅 近期更新与计划
+
+- [ ] **文件操作服务** (`file_service`): 支持文件的增删改查能力。
+- [ ] **Agent 工作空间**: 专属的文件操作空间（当前会话文件夹），让智能体能够像 AI IDE 一样操作文件。
+
 ---
+
 
 *Powered by SKILL AGENT Architecture*

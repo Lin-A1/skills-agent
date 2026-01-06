@@ -1,4 +1,4 @@
-[中文版](./README_zh.md) | **English**
+[中文版](./docx/README_zh.md) | **English**
 
 # MyAgent: General Purpose Skill-Based Agent Framework
 
@@ -57,7 +57,7 @@ myagent/
 ├── app/
 │   ├── agent/
 │   │   ├── core/
-│   │   │   └── skill_executor.py  # 🧠 The Brain's Hand: Loads and runs skills
+│   │   │   └── skill_executor.py  # 🧠 The Brain's Hand: Loads and runs skillsba
 │   │   └── ...
 ├── services/                      # 🧱 Skill Storage
 │   ├── websearch_service/
@@ -81,7 +81,7 @@ myagent/
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/your-username/myagent.git
+    git clone https://github.com/Lin-A1/myagent.git
     cd myagent
     ```
 
@@ -89,7 +89,7 @@ myagent/
     ```bash
     cp .env.example .env
     # Configure your API keys (OpenAI, etc.)
-    ```
+    ```https://github.com/Lin-A1/myagent.git
 
 3.  **Run with Docker**
     ```bash
@@ -97,7 +97,7 @@ myagent/
     ```
 
 ## 💻 Frontend Interface
-
+https://github.com/Lin-A1/myagent.git
 ![Frontend Interface](docs/images/frontend_screenshot.png)
 
 ### Running the Frontend
@@ -130,6 +130,13 @@ The frontend needs to be started in the development environment:
 3.  **Implement Client**: Create `client.py` with `class MyNewSkillClient`.
 4.  **Restart**: The Agent will automatically detect `my_new_skill`.
 
+
+## 📅 Recent Updates & Roadmap
+
+- [ ] **File Operation Service** (`file_service`): Capability to create, read, update, and delete files.
+- [ ] **Agent Workspace**: Dedicated file operation space (Current Session Folder) allowing the Agent to manipulate files like an AI IDE.
+
 ---
+
 
 *Powered by SKILL AGENT Architecture*
