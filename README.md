@@ -1,4 +1,4 @@
-[中文版](./docx/README_zh.md) | **English**
+[中文版](./docs/README_zh.md) | **English**
 
 # MyAgent: General Purpose Skill-Based Agent Framework
 
