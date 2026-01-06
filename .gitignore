@@ -83,3 +83,5 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .npmrc
+
+uv.lock 
