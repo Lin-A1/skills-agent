@@ -98,7 +98,7 @@ myagent/
 
 ## � 前端界面
 
-![前端界面](docs/images/frontend_screenshot.png)
+![前端界面](./images/frontend_screenshot.png)
 
 ### 启动前端
 前端需要在开发环境中启动：
