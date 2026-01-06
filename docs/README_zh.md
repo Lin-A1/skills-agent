@@ -139,4 +139,3 @@ myagent/
 ---
 
 
-*Powered by SKILL AGENT Architecture*

@@ -139,4 +139,3 @@ The frontend needs to be started in the development environment:
 ---
 
 
-*Powered by SKILL AGENT Architecture*
