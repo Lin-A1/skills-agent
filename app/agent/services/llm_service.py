@@ -94,8 +94,14 @@ class AgentLLMService:
                 **kwargs
             )
             
+            # 防御性检查
+            if not response.choices:
+                raise ValueError("LLM returned empty choices")
+            
+            content = response.choices[0].message.content or ""
+            
             return {
-                "content": response.choices[0].message.content,
+                "content": content,
                 "finish_reason": response.choices[0].finish_reason,
                 "usage": {
                     "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,

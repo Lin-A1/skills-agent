@@ -190,9 +190,19 @@ class AgentService:
         user_id = request.user_id or "anonymous"
         session = self._get_session(request.session_id, user_id)
         
-        # 添加用户消息到会话
-        session.add_user_message(request.message)
+        # 添加用户消息到会话，获取消息 ID
+        user_message_id = session.add_user_message(request.message)
         self._commit_session(session.session_id)
+        
+        # 发送 START 事件，包含用户消息 ID
+        yield AgentEvent(
+            type=AgentEventType.START,
+            data={
+                "session_id": session.session_id,
+                "user_message_id": user_message_id,
+                "message": request.message
+            }
+        )
         
         # 构建上下文
         context = await self._build_context(
@@ -339,12 +349,22 @@ class AgentService:
         session: SessionMemory,
         extra_context: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """构建执行上下文"""
-        context = {}
+        """
+        构建执行上下文
         
-        # 会话历史摘要
-        if session.session.message_count and session.session.message_count > 0:
-            context["session_history"] = session.get_summary()
+        注意：不再自动注入历史摘要，而是提供 session_id，
+        让 Agent 自主决定是否通过 memory_service 检索记忆
+        """
+        context = {
+            # 提供会话信息，供 Agent 在需要时使用 memory_service
+            "session_id": session.session_id,
+            "message_count": session.session.message_count or 0,
+        }
+        
+        # 仅在消息数较少时（新会话或很短的对话）提供简要历史
+        # 复杂的记忆检索交给 Agent 自主调用 memory_service
+        if session.session.message_count and 1 <= session.session.message_count <= 4:
+            context["recent_context"] = session.get_summary()
         
         # 额外上下文
         if extra_context:
@@ -561,6 +581,11 @@ class AgentService:
         """
         from storage.pgsql.models import AgentSession
         
+        # 等待一小会儿，确保之前的事务已完整提交
+        await asyncio.sleep(1)
+        
+        logger.info(f"Starting title generation for session {session_id}")
+        
         db = _get_db_session()
         try:
             # 获取会话
@@ -569,56 +594,57 @@ class AgentService:
                 logger.warning(f"Agent session {session_id} not found for title generation")
                 return
             
-            # 如果已有标题且不是默认值，跳过
-            default_titles = ["New Chat", "新对话", None, ""]
-            if session.title and session.title not in default_titles:
-                logger.debug(f"Session {session_id} already has custom title: {session.title}")
+            # 检查现有标题
+            current_title = session.title or ""
+            # 如果标题很长且不包含"New Chat"或"新对话"，可能已经是有效标题
+            if len(current_title) > 20 and "Chat" not in current_title and "对话" not in current_title:
+                logger.debug(f"Session {session_id} likely has custom title: {current_title}")
                 return
             
-            # 获取会话内存以读取消息
-            session_memory = self._get_session(session_id, user_id)
-            messages = session_memory.get_messages(limit=3)
+            # 获取会话消息
+            # 这里不使用 SessionMemory，而是直接查表，避免 Session 对象冲突
+            from storage.pgsql.models import AgentMessage
+            first_user_msg = db.query(AgentMessage).filter(
+                AgentMessage.session_id == session_id,
+                AgentMessage.role == "user"
+            ).order_by(AgentMessage.created_at).first()
             
-            if not messages:
-                logger.warning(f"No messages found for session {session_id}")
-                return
-            
-            # 只取第一条用户消息来生成标题
-            user_message = None
-            for msg in messages:
-                if msg.get("role") == "user":
-                    user_message = msg.get("content", "")
-                    break
-            
-            if not user_message:
+            if not first_user_msg:
                 logger.info(f"No user message found in session {session_id}")
                 return
             
+            user_message = first_user_msg.content[:200]
+            logger.info(f"Generating title from message: {user_message[:50]}...")
+            
             # 使用 LLM 生成标题
-            from services.llm_service.client import LLMServiceClient
-            llm = LLMServiceClient()
+            from .llm_service import agent_llm_service
             
             prompt = [
-                {"role": "system", "content": "Generate a concise (max 20 chars) title for this conversation. Return ONLY the title text, no quotes or prefixes. Language should match the user's message."},
+                {"role": "system", "content": "Generate a concise (max 15 chars) title for this conversation. Return ONLY the title text. No quotes. Language should match the user's message."},
                 {"role": "user", "content": user_message},
                 {"role": "user", "content": "Generate a title."}
             ]
             
-            response = await llm.async_chat_completion(
+            response = await agent_llm_service.chat_completion(
                 messages=prompt,
                 max_tokens=30,
-                temperature=0.5
+                temperature=0.7
             )
             
-            title = response.get("content", "").strip().strip('"').strip("'")[:50]
+            title = response.get("content", "").strip().strip('"').strip("'")
+            # 清理可能的 markdown 格式
+            title = title.split('\n')[0].replace('#', '').strip()
             
             if title:
-                session.title = title
+                session.title = title[:50]
                 db.commit()
-                logger.info(f"Generated title for agent session {session_id}: {title}")
+                logger.info(f"SUCCESS: Generated title for agent session {session_id}: {title}")
+            else:
+                logger.warning(f"LLM returned empty title for session {session_id}")
             
         except Exception as e:
-            logger.error(f"Error generating agent session title: {e}")
+            logger.error(f"Failed to generate session title: {e}", exc_info=True)
+            db.rollback()
         finally:
             db.close()
 

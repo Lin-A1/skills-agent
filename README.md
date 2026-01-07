@@ -151,17 +151,28 @@ Your documentation content here...
 - Use `related_tools` to attach guidelines to executable tools (the guide will appear under those tools)
 
 
+## 🌟 Key Capabilities
+
+### 🧠 Autonomous Memory
+The Agent isn't just a chatbot with a short-term buffer. It possesses **Long-term Episodic Memory** powered by a Rerank+LLM two-stage retrieval system.
+- **Autonomous Retrieval**: The Agent decides *when* to look back at history.
+- **Context Aware**: Understands references like "that bug we discussed yesterday".
+- **Two-Stage Precision**: Uses Rerank models for fast filtering and LLM for precise selection.
+
+### 🛡️ Secure Code Sandbox
+Executes code safely in isolated Docker containers.
+- **Polyglot**: Supports Python, Shell, and Bash.
+- **Secure**: Network isolated, resource-limited (CPU/RAM), and auto-cleaned.
+- **Persistent (Session-scoped)**: Variables and state can persist within a session's execution context.
+
 ## 📅 Recent Updates
 
 ### 2026-01-07
-- ✅ **Documentation-Only Skills**: Added support for non-executable skills (`executable: false`). Create reference documents without needing a `client.py`.
-- ✅ **Tool Association**: Skills can now declare `related_tools` to attach usage guidelines to executable tools.
-- ✅ **Search Strategy Optimization**: Added "Knowledge First" rule - Agent now uses its own knowledge before searching.
-- ✅ **Session Title Generation**: Agent sessions now auto-generate meaningful titles based on conversation content.
-- ✅ **UI Improvements**: 
-  - Fixed header to stay visible while scrolling
-  - Multi-line input support on empty state page
-  - Dynamic background colors for Agent mode
+- ✅ **Secure Code Sandbox**: Docker-based safe execution environment for Python/Shell, with resource limits and auto-cleanup.
+- ✅ **Autonomous Memory**: `memory_service` with Rerank+LLM two-stage retrieval, allowing the Agent to autonomously recall past conversations.
+- ✅ **Robust Agent Core**: Improved connection handling, automatic session title generation, and defensive programming against API failures.
+- ✅ **UI Enhancements**: Fixed message editing/regeneration flow, better error handling, and visualized "Thinking" state.
+- ✅ **Search Strategy**: Optimized "Knowledge First" rule - Agent prioritizes internal knowledge before searching.
 
 ### Roadmap
 - [ ] **File Operation Service** (`file_service`): Capability to create, read, update, and delete files.

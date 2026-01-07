@@ -138,11 +138,14 @@ class ReActEngine:
                 actions_to_execute = []
                 
                 # 支持单个 action
-                if "action" in step_result:
+                if step_result.get("action"):
                     actions_to_execute = [step_result["action"]]
                 # 支持并行 actions 数组
-                elif "actions" in step_result:
+                elif step_result.get("actions"):
                     actions_to_execute = step_result["actions"]
+                
+                # 过滤无效的动作
+                actions_to_execute = [a for a in actions_to_execute if isinstance(a, dict)]
                 
                 if actions_to_execute:
                     # Check for duplicate actions to prevent infinite loops
@@ -410,13 +413,22 @@ class ReActEngine:
         """格式化上下文信息"""
         parts = []
         
-        if "session_history" in context:
-            parts.append(f"**历史摘要：**\n{context['session_history']}")
+        # 会话信息
+        if "session_id" in context:
+            session_info = f"**当前会话**: session_id=`{context['session_id']}`, 已有 {context.get('message_count', 0)} 条消息"
+            if context.get('message_count', 0) > 4:
+                session_info += "\n> 💡 如需回顾历史对话，请使用 `memory_service.search()` 或 `memory_service.get_recent()`"
+            parts.append(session_info)
         
+        # 简短对话的最近上下文（自动注入）
+        if "recent_context" in context:
+            parts.append(f"**最近对话：**\n{context['recent_context']}")
+        
+        # 图片分析结果
         if "image_analysis" in context:
             parts.append(f"**图片分析：**\n{context['image_analysis']}")
         
-        return "\n\n".join(parts) if parts else "无额外上下文"
+        return "\n\n".join(parts) if parts else "新会话，无历史上下文"
     
     async def _think(
         self,

@@ -174,8 +174,7 @@ async def delete_message(
     if success:
         return {"success": True, "message_id": message_id}
     else:
-        # 即使返回 False 也可能只是消息不存在，不一定报错
-        return {"success": False, "message_id": message_id}
+        raise HTTPException(status_code=404, detail=f"Message '{message_id}' not found or delete failed")
 
 
 @router.post("/sessions/{session_id}/clear")

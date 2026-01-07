@@ -1,6 +1,7 @@
 """
 沙盒服务 - FastAPI 入口
 """
+import asyncio
 import logging
 import os
 import sys
@@ -65,6 +66,8 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     global executor
     
+    cleanup_task = None
+    
     try:
         executor = CodeExecutor()
         
@@ -74,8 +77,8 @@ async def lifespan(app: FastAPI):
             logger.error("Docker 不可用，沙盒服务将无法正常工作")
         else:
             logger.info("Docker 检查通过")
-            # 预拉取基础镜像（后台执行）
-            # await executor.pull_base_images()
+            # 启动定期清理任务
+            cleanup_task = asyncio.create_task(periodic_cleanup())
         
         logger.info("Sandbox 服务启动成功")
     except Exception as e:
@@ -84,7 +87,62 @@ async def lifespan(app: FastAPI):
     
     yield
     
+    # 关闭清理任务
+    if cleanup_task:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
+    
     logger.info("Sandbox 服务已关闭")
+
+
+async def periodic_cleanup():
+    """定期清理孤儿容器和未使用的镜像"""
+    import asyncio
+    
+    cleanup_interval = int(os.getenv("SANDBOX_CLEANUP_INTERVAL", "300"))  # 默认5分钟
+    
+    while True:
+        try:
+            await asyncio.sleep(cleanup_interval)
+            
+            # 清理已停止的沙盒容器
+            logger.info("开始定期清理...")
+            
+            # 清理名称以 sandbox_ 开头的容器
+            process = await asyncio.create_subprocess_exec(
+                "docker", "container", "ls", "-aq", "--filter", "name=sandbox_",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL
+            )
+            stdout, _ = await process.communicate()
+            container_ids = stdout.decode().strip().split('\n')
+            container_ids = [c for c in container_ids if c]
+            
+            if container_ids:
+                logger.info(f"发现 {len(container_ids)} 个残留沙盒容器，正在清理...")
+                for cid in container_ids:
+                    try:
+                        rm_process = await asyncio.create_subprocess_exec(
+                            "docker", "rm", "-f", cid,
+                            stdout=asyncio.subprocess.DEVNULL,
+                            stderr=asyncio.subprocess.DEVNULL
+                        )
+                        await rm_process.wait()
+                    except Exception:
+                        pass
+                logger.info("容器清理完成")
+            
+            # 清理悬空镜像（可选，每小时执行一次）
+            # 这里暂时不执行，避免影响其他服务
+            
+        except asyncio.CancelledError:
+            logger.info("清理任务已取消")
+            break
+        except Exception as e:
+            logger.warning(f"清理任务出错: {e}")
 
 
 app = FastAPI(

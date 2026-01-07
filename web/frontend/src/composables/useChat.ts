@@ -103,13 +103,10 @@ export const useChat = () => {
         }
     }
 
-    const autoResizeTextarea = (event: Event) => {
-        const el = event.target as HTMLTextAreaElement
-        if (el) {
-            el.style.height = 'auto'
-            el.style.height = `${Math.min(el.scrollHeight, 200)}px`
-        }
-    }
+    // Auto-resize when input changes programmatically (e.g. paste or clear)
+    watch(input, () => {
+        nextTick(adjustHeight)
+    })
 
     // Scroll to bottom of chat
     const scrollToBottom = () => {
@@ -421,14 +418,20 @@ export const useChat = () => {
         if (!targetMsg) return
 
         // 1. Delete this message and all messages after it from backend
+        let deleteSuccess = true
         if (sessionId.value && targetMsg.id) {
             if (isAgentMode.value) {
                 try {
-                    await fetch(`/api/agent/sessions/${sessionId.value}/messages/${targetMsg.id}?include_following=true`, {
+                    const response = await fetch(`/api/agent/sessions/${sessionId.value}/messages/${targetMsg.id}?include_following=true`, {
                         method: 'DELETE'
                     })
+                    if (!response.ok) {
+                        console.error('Delete API returned error:', response.status)
+                        deleteSuccess = false
+                    }
                 } catch (err) {
                     console.error('Failed to delete messages in agent mode:', err)
+                    deleteSuccess = false
                 }
             } else {
                 // Chat mode: delete one by one
@@ -436,15 +439,25 @@ export const useChat = () => {
                     const msg = messages.value[i]
                     if (msg && msg.id) {
                         try {
-                            await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
+                            const response = await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
                                 method: 'DELETE'
                             })
+                            if (!response.ok) {
+                                deleteSuccess = false
+                            }
                         } catch (err) {
                             console.error('Failed to delete message:', err)
+                            deleteSuccess = false
                         }
                     }
                 }
             }
+        }
+
+        if (!deleteSuccess) {
+            showToast('删除消息失败，请刷新页面重试', 'error')
+            cancelEdit()
+            return
         }
 
         // 2. Remove messages locally (including the one being edited)
@@ -799,10 +812,26 @@ export const useChat = () => {
 
                     try {
                         const event = JSON.parse(dataStr)
-                        // event format: { type: "thought"|"action"|"observation"|"final_answer"|"error", data: ... }
+                        // event format: { type: "start"|"thought"|"action"|"observation"|"final_answer"|"error", data: ... }
 
                         const type = event.type
                         const data = event.data
+
+                        // Handle START event - update user message ID with real UUID
+                        if (type === 'start' && data) {
+                            if (data.session_id && !sessionId.value) {
+                                sessionId.value = data.session_id
+                                loadSessions()
+                            }
+                            // Update user message ID with the real UUID from backend
+                            if (data.user_message_id) {
+                                const userMsgIndex = messages.value.length - 2 // User message is second to last
+                                if (userMsgIndex >= 0 && messages.value[userMsgIndex]?.role === 'user') {
+                                    messages.value[userMsgIndex].id = data.user_message_id
+                                }
+                            }
+                            continue
+                        }
 
                         const lastMsg = messages.value[messages.value.length - 1]
                         if (lastMsg && lastMsg.id === assistantMsgId) {
@@ -1041,7 +1070,6 @@ export const useChat = () => {
         loadSession,
         deleteSession,
         adjustHeight,
-        autoResizeTextarea,
         textareaRef,
         scrollContainerRef,
         bottomRef,

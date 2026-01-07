@@ -22,7 +22,7 @@ const toggleSidebarDesktop = () => { isSidebarCollapsed.value = !isSidebarCollap
 const { 
   messages, input, handleSubmit, status, sessionId, sessions,
   startNewSession, loadSession: internalLoadSession, deleteSession,
-  adjustHeight, autoResizeTextarea, textareaRef, scrollContainerRef, bottomRef,
+  adjustHeight, textareaRef, scrollContainerRef, bottomRef,
   copyMessage, copiedMessageId, editingMessageId, editingContent,
   startEdit, cancelEdit, saveEditAndRegenerate, stopGeneration,
   rollbackToMessage, isLoadingSession,
@@ -286,10 +286,10 @@ const groupedSessions = computed(() => {
                             v-model="input"
                             ref="textareaRef"
                             @keydown.enter.exact.prevent="handleSubmit"
-                            @input="autoResizeTextarea"
-                            placeholder="询问任何问题..."
+                            @input="adjustHeight"
+                            placeholder="询问任何问题... (Shift+Enter 换行)"
                             rows="1"
-                            class="flex-1 bg-transparent border-none focus:ring-0 text-lg px-4 py-3 placeholder:text-[#A8A29E] text-[#1C1917] resize-none overflow-hidden min-h-[48px] max-h-[200px]"
+                            class="flex-1 bg-transparent border-none focus:ring-0 text-lg px-4 py-3 placeholder:text-[#A8A29E] text-[#1C1917] resize-none overflow-hidden min-h-[56px] max-h-[200px]"
                             :disabled="false"
                             autocomplete="off"
                          ></textarea>
