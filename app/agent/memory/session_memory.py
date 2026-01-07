@@ -288,24 +288,30 @@ class SessionMemory:
         return self.session.session_context.get(key, default)
     
     def get_summary(self) -> str:
-        """生成会话摘要"""
-        user_messages = self.db.query(self.AgentMessage).filter(
-            self.AgentMessage.session_id == self.session.id,
-            self.AgentMessage.role == "user"
-        ).order_by(self.AgentMessage.created_at).all()
+        """生成会话摘要，包含最近的对话历史"""
+        # 获取最近的消息（用户和助手都要）
+        recent_messages = self.db.query(self.AgentMessage).filter(
+            self.AgentMessage.session_id == self.session.id
+        ).order_by(self.AgentMessage.created_at.desc()).limit(6).all()
         
-        if not user_messages:
+        if not recent_messages:
             return "空会话"
         
-        # 使用第一条和最后一条用户消息构建摘要
-        first = user_messages[0].content[:100]
-        last = user_messages[-1].content[:100] if len(user_messages) > 1 else ""
+        # 反转顺序（从旧到新）
+        recent_messages = list(reversed(recent_messages))
         
-        summary = f"会话开始: {first}"
-        if last and last != first:
-            summary += f"\n最近消息: {last}"
+        # 构建对话历史
+        history_parts = []
+        for msg in recent_messages:
+            role_label = "用户" if msg.role == "user" else "助手"
+            content = msg.content if msg.content else "(空)"
+            # 跳过占位符消息
+            if content == "(No response generated)":
+                continue
+            history_parts.append(f"【{role_label}】: {content}")
         
-        summary += f"\n消息数: {self.session.message_count or 0}"
+        summary = "## 最近对话历史\n" + "\n\n".join(history_parts)
+        summary += f"\n\n---\n总消息数: {self.session.message_count or 0}"
         
         return summary
     

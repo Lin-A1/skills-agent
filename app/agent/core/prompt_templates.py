@@ -343,13 +343,13 @@ def format_history(history: list[dict]) -> str:
         if observations: # Multiple observations
             for obs in observations:
                 tool = obs.get("tool", "")
-                result = str(obs.get("result", ""))[:200]
-                formatted.append(f"Observation({tool}): {result}...")
+                result = str(obs.get("result", ""))
+                formatted.append(f"Observation({tool}): {result}")
         else: # Single observation
              observation = step.get("observation", {})
              if observation:
-                 result = str(observation.get("result", ""))[:200]
-                 formatted.append(f"Observation: {result}...")
+                 result = str(observation.get("result", ""))
+                 formatted.append(f"Observation: {result}")
                  
         formatted.append("---")
 
