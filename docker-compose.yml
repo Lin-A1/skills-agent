@@ -76,6 +76,9 @@ services:
       - MILVUS_HOST=milvus # 向量数据库
       - MILVUS_PORT=19530
       - EMBEDDING_HOST=embedding_service # Embedding 服务
+      - OCR_HOST=ocr_service # OCR 服务
+      - OCR_PORT=8001
+      - SEARXNG_URL=http://searxng:8080 # SearXNG 搜索服务 (容器内部端口)
     volumes:
       - ./services/websearch_service:/app
       - ./storage:/app/storage
