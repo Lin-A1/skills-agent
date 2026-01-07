@@ -282,6 +282,9 @@ class AgentService:
         if final_answer:
             session.add_assistant_message(str(final_answer))
             self._commit_session(session.session_id)
+            
+            # 异步生成会话标题（后台执行，不阻塞响应）
+            asyncio.create_task(self.generate_session_title(session.session_id, user_id))
     
     async def run_agent_sync(
         self,
@@ -551,6 +554,73 @@ class AgentService:
                 "success": False,
                 "error": str(e)
             }
+
+    async def generate_session_title(self, session_id: str, user_id: str = "anonymous"):
+        """
+        使用 LLM 为 Agent 会话生成标题（异步）
+        """
+        from storage.pgsql.models import AgentSession
+        
+        db = _get_db_session()
+        try:
+            # 获取会话
+            session = db.query(AgentSession).filter(AgentSession.id == session_id).first()
+            if not session:
+                logger.warning(f"Agent session {session_id} not found for title generation")
+                return
+            
+            # 如果已有标题且不是默认值，跳过
+            default_titles = ["New Chat", "新对话", None, ""]
+            if session.title and session.title not in default_titles:
+                logger.debug(f"Session {session_id} already has custom title: {session.title}")
+                return
+            
+            # 获取会话内存以读取消息
+            session_memory = self._get_session(session_id, user_id)
+            messages = session_memory.get_messages(limit=3)
+            
+            if not messages:
+                logger.warning(f"No messages found for session {session_id}")
+                return
+            
+            # 只取第一条用户消息来生成标题
+            user_message = None
+            for msg in messages:
+                if msg.get("role") == "user":
+                    user_message = msg.get("content", "")
+                    break
+            
+            if not user_message:
+                logger.info(f"No user message found in session {session_id}")
+                return
+            
+            # 使用 LLM 生成标题
+            from services.llm_service.client import LLMServiceClient
+            llm = LLMServiceClient()
+            
+            prompt = [
+                {"role": "system", "content": "Generate a concise (max 20 chars) title for this conversation. Return ONLY the title text, no quotes or prefixes. Language should match the user's message."},
+                {"role": "user", "content": user_message},
+                {"role": "user", "content": "Generate a title."}
+            ]
+            
+            response = await llm.async_chat_completion(
+                messages=prompt,
+                max_tokens=30,
+                temperature=0.5
+            )
+            
+            title = response.get("content", "").strip().strip('"').strip("'")[:50]
+            
+            if title:
+                session.title = title
+                db.commit()
+                logger.info(f"Generated title for agent session {session_id}: {title}")
+            
+        except Exception as e:
+            logger.error(f"Error generating agent session title: {e}")
+        finally:
+            db.close()
 
 
 # 全局 Agent 服务实例

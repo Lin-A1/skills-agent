@@ -46,7 +46,33 @@ class SkillExecutor:
                 return skill.get("metadata", {})
         return {}
     
-    def _get_client(self, skill_name: str) -> Any:
+    def _is_executable(self, skill_name: str) -> bool:
+        """
+        检查技能是否可执行
+        
+        可执行条件（满足任一）：
+        1. SKILL.md 中 executable 字段不为 false
+        2. 存在 client.py 文件
+        """
+        meta = self._get_skill_meta(skill_name)
+        
+        # 显式标记为不可执行
+        if meta.get("executable") is False:
+            return False
+        
+        # 检查是否有 client_class 或能找到 client 模块
+        if meta.get("client_class"):
+            return True
+        
+        # 尝试检测 client 模块是否存在
+        try:
+            import importlib.util
+            spec = importlib.util.find_spec(f"services.{skill_name}.client")
+            return spec is not None
+        except (ModuleNotFoundError, ValueError):
+            return False
+    
+    def _get_client(self, skill_name: str) -> Optional[Any]:
         """
         获取或创建服务客户端实例（从 SKILL.md 读取类名）
         
@@ -54,8 +80,13 @@ class SkillExecutor:
             skill_name: 技能/服务名称
             
         Returns:
-            客户端实例
+            客户端实例，如果技能不可执行则返回 None
         """
+        # 检查是否可执行
+        if not self._is_executable(skill_name):
+            logger.debug(f"Skill {skill_name} is not executable (documentation only)")
+            return None
+        
         if skill_name in self._clients:
             return self._clients[skill_name]
         
@@ -120,6 +151,18 @@ class SkillExecutor:
             # 获取客户端
             client = self._get_client(skill_name)
             
+            # 处理不可执行的技能
+            if client is None:
+                meta = self._get_skill_meta(skill_name)
+                skill_desc = meta.get("description", "此技能仅供参考")
+                return {
+                    "success": False,
+                    "result": None,
+                    "error": f"技能 '{skill_name}' 是文档类技能，不可直接执行。描述：{skill_desc}",
+                    "execution_time": time.time() - start_time,
+                    "executable": False
+                }
+            
             # 获取方法
             if not hasattr(client, method):
                 raise ValueError(f"技能 {skill_name} 没有方法 {method}")
@@ -165,17 +208,51 @@ class SkillExecutor:
         if self.registry:
             # 从 SkillRegistry 获取技能列表
             skills = self.registry.list_all()
-            result = []
+            
+            # 第一遍：收集所有技能信息和关联关系
+            all_tools = {}
+            related_docs = {}  # tool_name -> [related doc content]
+            
             for skill in skills:
-                name = skill["name"]
-                meta = self._get_skill_meta(name)
-                result.append({
+                name = skill["name"]  # 显示名
+                dir_name = skill.get("dir_name", name)  # 目录名
+                meta = self._get_skill_meta(dir_name)
+                is_executable = self._is_executable(dir_name)
+                skill_data = self.registry.get(dir_name)
+                
+                tool_info = {
                     "name": name,
+                    "dir_name": dir_name,
                     "description": skill["description"],
                     "client_class": meta.get("client_class", ""),
                     "default_method": meta.get("default_method", "execute"),
-                    "methods": self._get_skill_methods(name)
-                })
+                    "methods": self._get_skill_methods(dir_name) if is_executable else [],
+                    "executable": is_executable
+                }
+                
+                # 对于文档类技能，包含完整的 body 内容
+                if not is_executable and skill_data and skill_data.get("body"):
+                    tool_info["body"] = skill_data["body"]
+                    
+                    # 处理关联关系：将此文档关联到目标工具
+                    related_tools = meta.get("related_tools", [])
+                    for related_tool in related_tools:
+                        if related_tool not in related_docs:
+                            related_docs[related_tool] = []
+                        related_docs[related_tool].append({
+                            "name": name,
+                            "body": skill_data["body"]
+                        })
+                
+                all_tools[name] = tool_info
+            
+            # 第二遍：将关联文档附加到可执行工具
+            result = []
+            for name, tool_info in all_tools.items():
+                if tool_info["executable"] and name in related_docs:
+                    tool_info["related_docs"] = related_docs[name]
+                result.append(tool_info)
+            
             return result
         else:
             return []

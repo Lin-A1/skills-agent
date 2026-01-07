@@ -22,7 +22,7 @@ const toggleSidebarDesktop = () => { isSidebarCollapsed.value = !isSidebarCollap
 const { 
   messages, input, handleSubmit, status, sessionId, sessions,
   startNewSession, loadSession: internalLoadSession, deleteSession,
-  adjustHeight, textareaRef, scrollContainerRef, bottomRef,
+  adjustHeight, autoResizeTextarea, textareaRef, scrollContainerRef, bottomRef,
   copyMessage, copiedMessageId, editingMessageId, editingContent,
   startEdit, cancelEdit, saveEditAndRegenerate, stopGeneration,
   rollbackToMessage, isLoadingSession,
@@ -211,7 +211,10 @@ const groupedSessions = computed(() => {
       </div>
 
       <!-- Top Bar -->
-      <header class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-black/5 bg-[#FAFAF9]/90 backdrop-blur-xl supports-[backdrop-filter]:bg-[#FAFAF9]/80 transition-all duration-300">
+      <header :class="[
+        'sticky top-0 z-30 flex items-center justify-between px-4 py-3 border-b border-black/5 backdrop-blur-xl transition-all duration-300',
+        isAgentMode ? 'bg-[#F0F4FF]/90' : 'bg-[#FAFAF9]/90'
+      ]">
         <div class="flex items-center gap-3">
           <!-- Mobile Menu Button -->
            <button @click="toggleSidebar" class="md:hidden p-2 -ml-2 hover:bg-black/5 rounded-xl transition-colors">
@@ -279,15 +282,17 @@ const groupedSessions = computed(() => {
                          </Button>
 
                          <!-- Input -->
-                         <input
+                         <textarea
                             v-model="input"
                             ref="textareaRef"
                             @keydown.enter.exact.prevent="handleSubmit"
+                            @input="autoResizeTextarea"
                             placeholder="询问任何问题..."
-                            class="flex-1 bg-transparent border-none focus:ring-0 text-lg px-4 py-3 placeholder:text-[#A8A29E] text-[#1C1917]"
+                            rows="1"
+                            class="flex-1 bg-transparent border-none focus:ring-0 text-lg px-4 py-3 placeholder:text-[#A8A29E] text-[#1C1917] resize-none overflow-hidden min-h-[48px] max-h-[200px]"
                             :disabled="false"
                             autocomplete="off"
-                         />
+                         ></textarea>
 
                          <!-- Right Actions -->
                          <div class="flex items-center gap-1 pr-1">

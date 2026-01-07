@@ -103,6 +103,14 @@ export const useChat = () => {
         }
     }
 
+    const autoResizeTextarea = (event: Event) => {
+        const el = event.target as HTMLTextAreaElement
+        if (el) {
+            el.style.height = 'auto'
+            el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+        }
+    }
+
     // Scroll to bottom of chat
     const scrollToBottom = () => {
         nextTick(() => {
@@ -1033,6 +1041,7 @@ export const useChat = () => {
         loadSession,
         deleteSession,
         adjustHeight,
+        autoResizeTextarea,
         textareaRef,
         scrollContainerRef,
         bottomRef,

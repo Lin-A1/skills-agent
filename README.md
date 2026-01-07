@@ -114,6 +114,7 @@ The frontend needs to be started in the development environment:
 
 ## 🔧 How to Add a New Skill
 
+### Executable Skill (with client)
 1.  **Create Directory**: `mkdir services/my_new_skill`
 2.  **Define Skill**: Create `SKILL.md`.
     ```markdown
@@ -130,13 +131,42 @@ The frontend needs to be started in the development environment:
 3.  **Implement Client**: Create `client.py` with `class MyNewSkillClient`.
 4.  **Restart**: The Agent will automatically detect `my_new_skill`.
 
+### Documentation-Only Skill (no client needed)
+For reference documents, guidelines, or templates that don't need code execution:
 
-## 📅 Recent Updates & Roadmap
+```markdown
+---
+name: coding_guidelines
+description: Code style and best practices reference.
+executable: false
+related_tools:        # Optional: attach this guide to other tools
+  - sandbox_service
+---
 
+## Guidelines
+Your documentation content here...
+```
+
+- Set `executable: false` to mark as documentation-only
+- Use `related_tools` to attach guidelines to executable tools (the guide will appear under those tools)
+
+
+## 📅 Recent Updates
+
+### 2026-01-07
+- ✅ **Documentation-Only Skills**: Added support for non-executable skills (`executable: false`). Create reference documents without needing a `client.py`.
+- ✅ **Tool Association**: Skills can now declare `related_tools` to attach usage guidelines to executable tools.
+- ✅ **Search Strategy Optimization**: Added "Knowledge First" rule - Agent now uses its own knowledge before searching.
+- ✅ **Session Title Generation**: Agent sessions now auto-generate meaningful titles based on conversation content.
+- ✅ **UI Improvements**: 
+  - Fixed header to stay visible while scrolling
+  - Multi-line input support on empty state page
+  - Dynamic background colors for Agent mode
+
+### Roadmap
 - [ ] **File Operation Service** (`file_service`): Capability to create, read, update, and delete files.
-- [ ] **Agent Workspace**: Dedicated file operation space (Current Session Folder) allowing the Agent to manipulate files like an AI IDE.
+- [ ] **Agent Workspace**: Dedicated file operation space allowing the Agent to manipulate files like an AI IDE.
 - [ ] **Todo Management**: A skill to manage tasks and to-do lists.
 
 ---
-
 

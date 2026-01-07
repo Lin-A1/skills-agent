@@ -187,6 +187,7 @@ class SkillRegistry:
         return [
             {
                 "name": skill["metadata"].get("name", name),
+                "dir_name": name,  # 目录名，用于 registry.get()
                 "description": skill["metadata"].get("description", ""),
             }
             for name, skill in self.skills.items()
