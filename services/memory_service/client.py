@@ -122,7 +122,7 @@ class MemoryServiceClient:
                 self.AgentSession,
                 self.AgentMessage.session_id == self.AgentSession.id
             ).filter(
-                self.AgentSession.session_id == session_id,  # 必须限定会话
+                self.AgentSession.id == session_id,  # AgentSession 的主键是 id
                 self.AgentSession.user_id == user_id,
                 self.AgentMessage.role.in_(["user", "assistant"])
             )
@@ -138,18 +138,36 @@ class MemoryServiceClient:
             if not candidates:
                 return {"success": True, "results": [], "total": 0}
             
-            # 两阶段检索：Rerank 初筛 + LLM 精选
+            # 两阶段检索：Rerank 初筛 + LLM 知识提取
             if self.rerank_client and len(candidates) > limit:
-                results = self._two_stage_retrieval(query, candidates, limit)
+                retrieval_result = self._two_stage_retrieval(query, candidates, limit)
+                
+                # 返回格式根据类型不同
+                if retrieval_result.get("type") == "knowledge":
+                    return {
+                        "success": True,
+                        "type": "knowledge",
+                        "summary": retrieval_result.get("summary", ""),
+                        "source_count": retrieval_result.get("source_count", 0),
+                        "total": retrieval_result.get("source_count", 0)
+                    }
+                else:
+                    results = retrieval_result.get("results", [])
+                    return {
+                        "success": True,
+                        "type": "messages", 
+                        "results": results,
+                        "total": len(results)
+                    }
             else:
                 # 降级为简单关键词匹配 + 时间排序
                 results = self._keyword_rank(query, candidates, limit)
-            
-            return {
-                "success": True,
-                "results": results,
-                "total": len(results)
-            }
+                return {
+                    "success": True,
+                    "type": "messages",
+                    "results": results,
+                    "total": len(results)
+                }
             
         except Exception as e:
             logger.error(f"Memory search failed: {e}")
@@ -165,12 +183,12 @@ class MemoryServiceClient:
         query: str,
         candidates: List[Any],
         limit: int
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
-        两阶段检索：Rerank 初筛 + LLM 精选
+        两阶段检索：Rerank 初筛 + LLM 知识提取
         
         Stage 1: Rerank 从 50 条中选出 top 10
-        Stage 2: LLM 从 10 条中做最终判断
+        Stage 2: LLM 从 top 10 中提取并整理相关知识
         """
         try:
             # === Stage 1: Rerank 初筛 ===
@@ -202,69 +220,113 @@ class MemoryServiceClient:
             if not stage1_candidates:
                 return self._keyword_rank(query, candidates, limit)
             
-            # === Stage 2: LLM 精选 ===
-            if self.llm_client and len(stage1_candidates) > limit:
-                return self._llm_select(query, stage1_candidates, limit)
-            else:
-                # 如果没有 LLM，直接返回 Rerank 结果
-                return self._format_results(stage1_candidates[:limit])
+            # === Stage 2: LLM 知识提取 ===
+            if self.llm_client:
+                extracted = self._llm_extract(query, stage1_candidates, limit)
+                if extracted:
+                    # 返回整理后的知识
+                    return {
+                        "type": "knowledge",
+                        "summary": extracted.get("summary", ""),
+                        "source_count": extracted.get("source_count", len(stage1_candidates)),
+                        "success": True
+                    }
+            
+            # 降级：返回原始消息列表
+            return {
+                "type": "messages",
+                "results": self._format_results(stage1_candidates[:limit]),
+                "success": True
+            }
             
         except Exception as e:
             logger.warning(f"Two-stage retrieval failed: {e}")
-            return self._keyword_rank(query, candidates, limit)
+            return {
+                "type": "messages",
+                "results": self._keyword_rank(query, candidates, limit),
+                "success": True
+            }
     
-    async def _llm_select_async(
+    async def _llm_extract_async(
         self,
         query: str,
         candidates: List[Dict[str, Any]],
         limit: int
-    ) -> List[Dict[str, Any]]:
-        """LLM 异步精选"""
-        # 构建候选列表
-        candidates_text = []
-        for i, c in enumerate(candidates):
+    ) -> Dict[str, Any]:
+        """LLM 从候选消息中提取和整理相关知识"""
+        # 构建候选对话内容
+        conversation_text = []
+        for c in candidates:
             msg = c["msg"]
             role_label = "用户" if msg.role == "user" else "助手"
-            time_str = msg.created_at.strftime("%m-%d %H:%M") if msg.created_at else "未知时间"
-            candidates_text.append(f"{i+1}. [{time_str}] [{role_label}] {msg.content[:200]}")
+            time_str = msg.created_at.strftime("%m-%d %H:%M") if msg.created_at else ""
+            conversation_text.append(f"[{time_str}] {role_label}: {msg.content[:500]}")
         
-        prompt = f"""从以下历史对话中，选择与查询最相关的 {limit} 条记录。
+        prompt = f"""你是一个记忆检索助手。请根据用户的查询，从历史对话中提取相关信息。
 
-查询：{query}
+【用户查询】
+{query}
 
-候选记录：
-{chr(10).join(candidates_text)}
+【历史对话片段】
+{chr(10).join(conversation_text)}
 
-请直接返回最相关记录的序号（用逗号分隔），例如：1,3,5
-只返回序号，不要其他内容。"""
+【任务】
+请根据查询，从上述对话中提取并整理相关信息。要求：
+1. 直接回答查询需要的信息
+2. 如果涉及用户的个人信息（姓名、偏好等），明确指出
+3. 如果历史中没有相关信息，明确说明
+4. 保持简洁，只提取相关内容
+
+【输出格式】
+直接输出整理好的相关信息，不要加多余的解释。"""
 
         try:
             response = await self.llm_client.chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
-                max_tokens=50
+                max_tokens=500
             )
             
             content = response.get("content", "")
-            # 解析序号
-            selected_indices = []
-            for part in content.replace(" ", "").split(","):
-                try:
-                    idx = int(part.strip()) - 1  # 转为 0-indexed
-                    if 0 <= idx < len(candidates):
-                        selected_indices.append(idx)
-                except ValueError:
-                    continue
-            
-            if selected_indices:
-                selected = [candidates[i] for i in selected_indices[:limit]]
-                return self._format_results(selected)
+            if content:
+                return {
+                    "success": True,
+                    "summary": content,
+                    "source_count": len(candidates),
+                    "query": query
+                }
             
         except Exception as e:
-            logger.warning(f"LLM select failed: {e}")
+            logger.warning(f"LLM extract failed: {e}")
         
-        # 降级返回 Rerank 结果
-        return self._format_results(candidates[:limit])
+        # 降级：返回原始消息格式
+        return None
+    
+    def _llm_extract(
+        self,
+        query: str,
+        candidates: List[Dict[str, Any]],
+        limit: int
+    ) -> Dict[str, Any]:
+        """LLM 同步知识提取（包装异步方法）"""
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        asyncio.run,
+                        self._llm_extract_async(query, candidates, limit)
+                    )
+                    return future.result(timeout=15)
+            else:
+                return loop.run_until_complete(
+                    self._llm_extract_async(query, candidates, limit)
+                )
+        except Exception as e:
+            logger.warning(f"LLM extract sync wrapper failed: {e}")
+            return None
     
     def _llm_select(
         self,
@@ -359,7 +421,7 @@ class MemoryServiceClient:
         try:
             # 查找会话
             session = self.db.query(self.AgentSession).filter(
-                self.AgentSession.session_id == session_id
+                self.AgentSession.id == session_id
             ).first()
             
             if not session:
@@ -409,7 +471,7 @@ class MemoryServiceClient:
         """
         try:
             session = self.db.query(self.AgentSession).filter(
-                self.AgentSession.session_id == session_id
+                self.AgentSession.id == session_id
             ).first()
             
             if not session:

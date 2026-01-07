@@ -50,7 +50,7 @@ graph TD
 
 ### 3. Core Capabilities
 The agent's power comes from its built-in skills:
-- **🧠 Autonomous Memory**: Uses `memory_service` (Rerank+LLM) to intelligently retrieve past conversations. The Agent autonomously decides *when* to look back.
+- **🧠 Session Memory**: Two-stage retrieval (Rerank → LLM Knowledge Extraction) within the current session. Stage 1 filters top candidates, Stage 2 uses LLM to extract and summarize relevant knowledge - not just selecting messages, but organizing useful information for the Agent.
 - **🛡️ Code Sandbox**: Safely executes Python/Shell code in isolated Docker containers with resource limits and auto-cleanup.
 - **🌐 Web Search**: Connects to the internet to fetch real-time information.
 

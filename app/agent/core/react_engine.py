@@ -60,6 +60,23 @@ class ReActEngine:
             self._llm_service = agent_llm_service
         return self._llm_service
     
+    def _inject_context_params(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        为特定工具自动注入上下文参数
+        
+        目前支持：
+        - memory_service: 自动注入 session_id（限制在当前会话内搜索）
+        """
+        if tool_name == "memory_service":
+            # 自动注入 session_id
+            if "session_id" not in arguments and hasattr(self, '_current_context'):
+                session_id = self._current_context.get("session_id")
+                if session_id:
+                    arguments = {**arguments, "session_id": session_id}
+                    logger.debug(f"Auto-injected session_id for memory_service: {session_id}")
+        
+        return arguments
+    
     async def run(
         self,
         task: str,
@@ -82,6 +99,9 @@ class ReActEngine:
         start_time = time.time()
         history: List[Dict[str, Any]] = []
         observations: List[Dict[str, Any]] = []
+        
+        # 保存当前上下文，供工具执行时使用
+        self._current_context = context or {}
         
         # 发送开始事件
         yield AgentEvent(
@@ -226,11 +246,15 @@ class ReActEngine:
                         # 并行执行
                         async def execute_action(act):
                             try:
+                                # 自动注入上下文参数（如 memory_service 的 session_id）
+                                tool_name = act.get("tool")
+                                arguments = self._inject_context_params(tool_name, act.get("arguments", {}))
+                                
                                 return await asyncio.wait_for(
                                     self.skill_executor.execute(
-                                        skill_name=act.get("tool"),
+                                        skill_name=tool_name,
                                         method=act.get("method", "execute"),
-                                        arguments=act.get("arguments", {})
+                                        arguments=arguments
                                     ),
                                     timeout=settings.AGENT_TOOL_TIMEOUT
                                 )
@@ -286,6 +310,9 @@ class ReActEngine:
                         tool_name = action.get("tool")
                         method = action.get("method", "execute")
                         arguments = action.get("arguments", {})
+                        
+                        # 自动注入上下文参数（如 memory_service 的 session_id）
+                        arguments = self._inject_context_params(tool_name, arguments)
                         
                         # 发送行动事件
                         yield AgentEvent(

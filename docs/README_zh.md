@@ -50,7 +50,7 @@ graph TD
 
 ### 3. 核心能力 (Core Capabilities)
 智能体能够通过内置的高级技能实现复杂任务：
-- **🧠 自主记忆 (Autonomous Memory)**：通过 `memory_service` (Rerank+LLM) 实现长期记忆。Agent 能理解上下文（如"上次说的那个..."）并自主决定何时检索历史。
+- **🧠 会话记忆 (Session Memory)**：两阶段检索（Rerank 初筛 → LLM 知识提取）。第一阶段筛选相关候选消息，第二阶段由 LLM 从中提取并整理有用知识——不是简单地选消息，而是为 Agent 整理可直接使用的信息。
 - **🛡️ 安全沙盒 (Secure Sandbox)**：在隔离的 Docker 容器中安全执行 Python/Shell 代码，具备资源限制和自动清理功能。
 - **🌐 联网搜索 (Web Search)**：实时获取互联网信息。
 
