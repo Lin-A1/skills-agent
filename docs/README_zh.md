@@ -25,23 +25,34 @@ graph TD
     Core <--> Executor[Skill 执行器]
     Executor -.-> |自动发现| Registry[Skill 注册表]
     
-    subgraph "服务层 / Service Layout"
-        S1[Service A]
-        S2[Service B]
-        S3[Service C]
+    subgraph "核心技能 / Core Skills"
+        Mem[Memory Service\n记忆服务]
+        Sand[Code Sandbox\n代码沙盒]
+    end
+
+    subgraph "外接技能 / External Skills"
+        Web[Web Search\n网络搜索]
+        RAG[RAG Service\n知识库]
     end
     
-    Registry --> S1
-    Registry --> S2
-    Registry --> S3
+    Registry --> Mem
+    Registry --> Sand
+    Registry --> Web
+    Registry --> RAG
     
-    S1 -- "SKILL.md" --> Executor
-    S2 -- "SKILL.md" --> Executor
+    Mem -- "Rerank+LLM\n自主检索" --> Executor
+    Sand -- "Docker\n隔离执行" --> Executor
 ```
 
 - **解耦**：技能与核心智能体逻辑解耦。
 - **热插拔**：`SkillRegistry` 动态识别新技能。
 - **自描述**：文档*即*接口。
+
+### 3. 核心能力 (Core Capabilities)
+智能体能够通过内置的高级技能实现复杂任务：
+- **🧠 自主记忆 (Autonomous Memory)**：通过 `memory_service` (Rerank+LLM) 实现长期记忆。Agent 能理解上下文（如"上次说的那个..."）并自主决定何时检索历史。
+- **🛡️ 安全沙盒 (Secure Sandbox)**：在隔离的 Docker 容器中安全执行 Python/Shell 代码，具备资源限制和自动清理功能。
+- **🌐 联网搜索 (Web Search)**：实时获取互联网信息。
 
 ## 🛠️ 特性
 
@@ -151,19 +162,7 @@ related_tools:        # 可选：将此指南关联到其他工具
 - 使用 `related_tools` 将指南关联到可执行工具（指南内容会显示在那些工具下方）
 
 
-## 🌟 核心能力
 
-### 🧠 自主记忆 (Autonomous Memory)
-智能体不再是只有短期缓冲区的聊天机器人。它拥有由 Rerank+LLM 两阶段检索系统驱动的**长期情景记忆**。
-- **自主检索**：智能体自主决定*何时*回顾历史。
-- **上下文感知**：理解"昨天讨论的那个bug"等指代关系。
-- **两阶段精准**：使用 Rerank 模型快速筛选，LLM 精准选择。
-
-### 🛡️ 安全代码沙盒 (Secure Code Sandbox)
-在隔离的 Docker 容器中安全执行代码。
-- **多语言**：支持 Python, Shell, Bash。
-- **安全**：网络隔离、资源限制 (CPU/RAM)、自动清理。
-- **持久化 (会话级)**：变量和状态可在会话的执行上下文中持久化。
 
 ## 📅 近期更新
 

@@ -22,26 +22,37 @@ Each skill is defined by a markdown file that serves dual purposes:
 ```mermaid
 graph TD
     LLM[LLM Brain] <--> Core[Agent Core]
-    Core <--> Executor[Skill Executor]
+    Core <--> |Orchestrates| Executor[Skill Executor]
     Executor -.-> |Discovers| Registry[Skill Registry]
     
-    subgraph "Service Layout"
-        S1[Service A]
-        S2[Service B]
-        S3[Service C]
+    subgraph "Core Skills"
+        Mem[Memory Service]
+        Sand[Code Sandbox]
+    end
+
+    subgraph "External Skills"
+        Web[Web Search]
+        RAG[RAG Service]
     end
     
-    Registry --> S1
-    Registry --> S2
-    Registry --> S3
+    Registry --> Mem
+    Registry --> Sand
+    Registry --> Web
+    Registry --> RAG
     
-    S1 -- "SKILL.md" --> Executor
-    S2 -- "SKILL.md" --> Executor
+    Mem -- "Rerank+LLM Retrieval" --> Executor
+    Sand -- "Docker Execution" --> Executor
 ```
 
 - **Decoupled**: Skills are decoupled from the core agent logic.
 - **Hot-Pluggable**: New skills are recognized by the `SkillRegistry` dynamically.
 - **Self-Describing**: The documentation *is* the interface.
+
+### 3. Core Capabilities
+The agent's power comes from its built-in skills:
+- **🧠 Autonomous Memory**: Uses `memory_service` (Rerank+LLM) to intelligently retrieve past conversations. The Agent autonomously decides *when* to look back.
+- **🛡️ Code Sandbox**: Safely executes Python/Shell code in isolated Docker containers with resource limits and auto-cleanup.
+- **🌐 Web Search**: Connects to the internet to fetch real-time information.
 
 ## 🛠️ Features
 
@@ -151,19 +162,7 @@ Your documentation content here...
 - Use `related_tools` to attach guidelines to executable tools (the guide will appear under those tools)
 
 
-## 🌟 Key Capabilities
 
-### 🧠 Autonomous Memory
-The Agent isn't just a chatbot with a short-term buffer. It possesses **Long-term Episodic Memory** powered by a Rerank+LLM two-stage retrieval system.
-- **Autonomous Retrieval**: The Agent decides *when* to look back at history.
-- **Context Aware**: Understands references like "that bug we discussed yesterday".
-- **Two-Stage Precision**: Uses Rerank models for fast filtering and LLM for precise selection.
-
-### 🛡️ Secure Code Sandbox
-Executes code safely in isolated Docker containers.
-- **Polyglot**: Supports Python, Shell, and Bash.
-- **Secure**: Network isolated, resource-limited (CPU/RAM), and auto-cleaned.
-- **Persistent (Session-scoped)**: Variables and state can persist within a session's execution context.
 
 ## 📅 Recent Updates
 
