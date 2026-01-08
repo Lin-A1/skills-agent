@@ -57,7 +57,6 @@ The agent's power comes from its built-in skills:
 ## 🛠️ Features
 
 - **Dynamic Discovery**: Uses `app/agent/core/skill_executor.py` to recursively scan `services/` for capabilities.
-- **Multi-Modal**: Support for text, code execution, and VLM (Visual Language Model) skills.
 - **Standardized Interface**: All skills implement a unified `Client` interface but expose specific logic via `SKILL.md`.
 - **Environment Aware**: Skills can span from local file manipulation to remote API calls (Web Search, RAG, etc.).
 
@@ -165,6 +164,12 @@ Your documentation content here...
 
 
 ## 📅 Recent Updates
+
+### 2026-01-08
+- ✅ **Session Persistence**: Session survives page refresh, automatically restores chat history (via localStorage).
+- ✅ **Dialogue Turn Calculation**: 4-turn threshold now counts only user messages (1 turn = 1 user message + corresponding assistant/tool), tool calls no longer affect threshold.
+- ✅ **LLM Knowledge Extraction**: Memory retrieval Stage 2 upgraded from "selecting indices" to "LLM directly organizing knowledge", returning usable information instead of raw messages.
+- ✅ **WebSearch Fixes**: Fixed OCR and SearXNG container network connection issues.
 
 ### 2026-01-07
 - ✅ **Secure Code Sandbox**: Docker-based safe execution environment for Python/Shell, with resource limits and auto-cleanup.

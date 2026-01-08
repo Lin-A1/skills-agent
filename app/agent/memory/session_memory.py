@@ -198,6 +198,19 @@ class SessionMemory:
             self.db.flush()
             logger.debug(f"Removed {excess_count} old messages from session {self.session_id}")
     
+    def get_user_message_count(self) -> int:
+        """
+        获取 user 消息数量（对话轮数）
+        
+        用于判断是否自动注入上下文：
+        - 4 轮以内：自动注入完整历史
+        - 超过 4 轮：提示 Agent 使用 memory_service
+        """
+        return self.db.query(self.AgentMessage).filter(
+            self.AgentMessage.session_id == self.session.id,
+            self.AgentMessage.role == "user"
+        ).count()
+    
     def get_messages(
         self,
         limit: Optional[int] = None,

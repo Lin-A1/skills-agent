@@ -29,7 +29,20 @@ export const useChat = () => {
     const messages = ref<ChatMessage[]>([])
     const input = ref('')
     const status = ref<'idle' | 'streaming'>('idle')
-    const sessionId = ref<string | null>(null)
+
+    // 从 localStorage 恢复 sessionId（刷新页面后保持会话）
+    const storedSessionId = localStorage.getItem('agent_session_id')
+    const sessionId = ref<string | null>(storedSessionId)
+
+    // 监听 sessionId 变化，同步到 localStorage
+    watch(sessionId, (newId) => {
+        if (newId) {
+            localStorage.setItem('agent_session_id', newId)
+        } else {
+            localStorage.removeItem('agent_session_id')
+        }
+    })
+
     const sessions = ref<SessionInfo[]>([])
     const copiedMessageId = ref<string | null>(null)
     const editingMessageId = ref<string | null>(null)
@@ -999,6 +1012,11 @@ export const useChat = () => {
     // Setup scroll listener and code copy handler
     onMounted(() => {
         loadSessions()
+
+        // 如果有保存的 sessionId，恢复会话消息
+        if (sessionId.value) {
+            loadSession(sessionId.value)
+        }
 
         nextTick(() => {
             // Bind scroll event to ScrollArea viewport

@@ -442,8 +442,10 @@ class ReActEngine:
         
         # 会话信息
         if "session_id" in context:
-            session_info = f"**当前会话**: session_id=`{context['session_id']}`, 已有 {context.get('message_count', 0)} 条消息"
-            if context.get('message_count', 0) > 4:
+            turn_count = context.get('turn_count', 0)
+            message_count = context.get('message_count', 0)
+            session_info = f"**当前会话**: session_id=`{context['session_id']}`, 已有 {turn_count} 轮对话（共 {message_count} 条消息）"
+            if turn_count > 4:
                 session_info += "\n> 💡 如需回顾历史对话，请使用 `memory_service.search()` 或 `memory_service.get_recent()`"
             parts.append(session_info)
         

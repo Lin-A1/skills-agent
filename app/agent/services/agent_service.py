@@ -355,15 +355,19 @@ class AgentService:
         注意：不再自动注入历史摘要，而是提供 session_id，
         让 Agent 自主决定是否通过 memory_service 检索记忆
         """
+        # 获取对话轮数（user 消息数）
+        user_message_count = session.get_user_message_count()
+        
         context = {
             # 提供会话信息，供 Agent 在需要时使用 memory_service
             "session_id": session.session_id,
             "message_count": session.session.message_count or 0,
+            "turn_count": user_message_count,  # 对话轮数
         }
         
-        # 仅在消息数较少时（新会话或很短的对话）提供简要历史
-        # 复杂的记忆检索交给 Agent 自主调用 memory_service
-        if session.session.message_count and 1 <= session.session.message_count <= 4:
+        # 4 轮以内自动注入完整历史（包含 user + assistant + tool）
+        # 超过 4 轮提示 Agent 使用 memory_service 检索
+        if 1 <= user_message_count <= 4:
             context["recent_context"] = session.get_summary()
         
         # 额外上下文
