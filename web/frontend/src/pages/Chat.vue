@@ -380,7 +380,7 @@ const groupedSessions = computed(() => {
               </div>
 
                <!-- Assistant Message -->
-              <div v-else class="flex gap-5 animate-in fade-in duration-700 slide-in-from-bottom-2" style="animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);">
+              <div v-else class="flex gap-5 animate-in fade-in duration-700 slide-in-from-bottom-2 group" style="animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);">
                 <div class="flex-shrink-0 mt-1">
                   <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[#334155] to-[#1e293b] flex items-center justify-center shadow-lg shadow-indigo-500/10">
                     <BookOpen class="w-4.5 h-4.5 text-white" />
