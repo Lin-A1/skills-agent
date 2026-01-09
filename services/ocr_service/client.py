@@ -1,7 +1,9 @@
 """OCR服务客户端"""
 import base64
+import json
 import os
-import requests
+import urllib.request
+import urllib.error
 from typing import Optional
 from pathlib import Path
 from dotenv import load_dotenv
@@ -37,31 +39,37 @@ class OCRServiceClient:
             dict: OCR识别结果
 
         Raises:
-            requests.RequestException: 请求失败时抛出异常
+            urllib.error.URLError: 请求失败时抛出异常
         """
         url = f"{self.base_url}/ocr"
-        response = requests.post(url, json={"image": _image_base64})
-        response.raise_for_status()
-        return response.json()['result'][0]
+        data = json.dumps({"image": _image_base64}).encode("utf-8")
+        
+        req = urllib.request.Request(
+            url, 
+            data=data, 
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            return result['result'][0]
 
     @staticmethod
-    def image_to_base64(image_path: str) -> dict:
+    def image_to_base64(image_path: str) -> str:
         """从图片文件进行OCR识别
 
         Args:
             image_path: 图片文件路径
 
         Returns:
-            dict: OCR识别结果
+            str: Base64编码的字符串
 
         Raises:
             FileNotFoundError: 文件不存在时抛出异常
-            requests.RequestException: 请求失败时抛出异常
         """
         with open(image_path, "rb") as f:
             image_data = f.read()
-        _image_base64 = base64.b64encode(image_data).decode("utf-8")
-        return _image_base64
+        return base64.b64encode(image_data).decode("utf-8")
 
     def health_check(self) -> dict:
         """健康检查
@@ -70,14 +78,16 @@ class OCRServiceClient:
             dict: 健康状态
         """
         url = f"{self.base_url}/health"
-        response = requests.get(url)
-        response.raise_for_status()
-        return response.json()
+        with urllib.request.urlopen(url) as response:
+            return json.loads(response.read().decode("utf-8"))
 
 
 if __name__ == "__main__":
     client = OCRServiceClient()
-    print(client.health_check())
-    image_base64 = client.image_to_base64("/home/lin/Pictures/267421c76d4150f3faf1489d55e210e2.jpg")
-    result = client.ocr(image_base64)
-    print(result)
+    try:
+        print(client.health_check())
+        # image_base64 = client.image_to_base64("path/to/image.jpg")
+        # result = client.ocr(image_base64)
+        # print(result)
+    except Exception as e:
+        print(f"Check failed: {e}")

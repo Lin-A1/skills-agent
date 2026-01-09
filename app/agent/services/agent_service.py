@@ -3,6 +3,7 @@ Agent Service - Business Logic Layer
 Orchestrates ReAct engine, memory systems, and tool execution
 """
 import asyncio
+import json
 import logging
 import time
 from datetime import datetime
@@ -234,6 +235,12 @@ class AgentService:
         # Inject session_id into intent data
         if isinstance(intent_event.data, dict):
             intent_event.data["session_id"] = session.session_id
+        
+        # 将意图分析结果注入上下文，供 ReAct 引擎使用
+        # 避免 ReAct 引擎重复进行意图分析
+        if intent_event.data:
+            context["intent_analysis"] = intent_event.data
+            
         yield intent_event
         
         # 收集事件用于后处理
@@ -251,6 +258,27 @@ class AgentService:
             yield event
             all_events.append(event)
             
+            # 保存执行计划
+            if event.type == AgentEventType.PLAN:
+                try:
+                    # 将 ExecutionPlan 对象转换为 dict
+                    plan_data = event.data
+                    if hasattr(plan_data, "steps"):
+                        import dataclasses
+                        if dataclasses.is_dataclass(plan_data):
+                            plan_data = dataclasses.asdict(plan_data)
+                        else:
+                            plan_data = dict(plan_data)
+                            
+                    session.add_message(
+                        role="assistant",
+                        content=f"[执行计划] {json.dumps(plan_data, ensure_ascii=False)}",
+                        extra_data={"type": "plan", "plan_data": plan_data}
+                    )
+                    self._commit_session(session.session_id)
+                except Exception as e:
+                    logger.error(f"Failed to persist plan: {e}")
+
             # 保存思考过程到会话
             if event.type == AgentEventType.THOUGHT:
                 session.add_message(
@@ -286,7 +314,9 @@ class AgentService:
             
             # 收集最终答案
             if event.type == AgentEventType.FINAL_ANSWER:
-                final_answer = event.data
+                if final_answer is None:
+                    final_answer = ""
+                final_answer += str(event.data)
         
         # 添加最终答案到会话
         if final_answer:

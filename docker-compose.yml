@@ -71,7 +71,7 @@ services:
     env_file:
       - .env
     environment:
-      - PGSQL_HOST=pgsql_service # 使用容器名连接数据库
+      - PGSQL_HOST=pgsql # 使用容器名连接数据库
       - PGSQL_PORT=5432 # 容器内部通信端口（固定）
       - MILVUS_HOST=milvus # 向量数据库
       - MILVUS_PORT=19530
@@ -166,11 +166,13 @@ services:
       # 信任模式下容器挂载路径（宿主机绝对路径）
       - SERVICES_MOUNT_PATH=${PWD}/services
       - ENV_FILE_PATH=${PWD}/.env
+      - WORKSPACE_MOUNT_PATH=${PWD}/storage/workspace # 沙盒容器挂载的工作区
     volumes:
       - ./services/sandbox_service:/app
       - ./services:/app/services # 挂载 services 供信任模式使用
       - ./.env:/app/.env:ro # 挂载环境变量文件
       - /var/run/docker.sock:/var/run/docker.sock # Docker-in-Docker
+      - ./storage/workspace:/workspace # 挂载工作区到服务本身
     group_add:
       - "999" # docker 组 GID，用于访问 docker.sock
     restart: unless-stopped
@@ -186,7 +188,7 @@ services:
     build:
       context: ./storage/pgsql
       dockerfile: Dockerfile
-    container_name: pgsql_service
+    container_name: pgsql
     ports:
       - "${PGSQL_PORT:-5432}:5432"
     environment:
@@ -251,7 +253,7 @@ services:
     env_file:
       - .env
     environment:
-      - PGSQL_HOST=pgsql_service # 使用容器名连接数据库
+      - PGSQL_HOST=pgsql # 使用容器名连接数据库
       - PGSQL_PORT=5432 # 容器内部通信端口（固定）
       - OCR_HOST=ocr_service # 使用容器名连接 OCR 服务
     restart: unless-stopped
@@ -276,7 +278,7 @@ services:
     env_file:
       - .env
     environment:
-      - PGSQL_HOST=pgsql_service
+      - PGSQL_HOST=pgsql
       - PGSQL_PORT=5432
       - SANDBOX_SERVICE_HOST=sandbox_service
       - SEARCH_SERVICE_HOST=websearch_service
@@ -288,6 +290,7 @@ services:
       - ./app/agent:/app/app/agent
       - ./services:/app/services
       - ./storage:/app/storage
+      - ./storage/workspace:/workspace # 挂载工作区
     restart: unless-stopped
     depends_on:
       pgsql:

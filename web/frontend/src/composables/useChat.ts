@@ -2,10 +2,11 @@ import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { mermaid } from '@/lib/markdown'
 
 export interface AgentStep {
-    type: 'thought' | 'action' | 'observation' | 'error'
+    type: 'thought' | 'action' | 'observation' | 'error' | 'plan'
     content: string
     toolName?: string
     toolInput?: any
+    planData?: any
 }
 
 export interface ChatMessage {
@@ -23,6 +24,11 @@ export interface SessionInfo {
     created_at: string
     updated_at: string
     message_count: number
+}
+
+export interface UploadedImage {
+    base64: string
+    name: string
 }
 
 export const useChat = () => {
@@ -301,6 +307,18 @@ export const useChat = () => {
                                     type: 'thought',
                                     content: m.content.replace('[思考] ', '')
                                 })
+                            } else if (m.content?.startsWith('[执行计划]')) {
+                                try {
+                                    const planJson = m.content.replace('[执行计划] ', '')
+                                    const planData = JSON.parse(planJson)
+                                    currentSteps.push({
+                                        type: 'plan',
+                                        content: 'Execution Plan',
+                                        planData: planData
+                                    })
+                                } catch (e) {
+                                    console.error('Failed to parse plan from history', e)
+                                }
                             } else {
                                 // Final answer - attach accumulated steps
                                 reconstructedMessages.push({
@@ -353,7 +371,14 @@ export const useChat = () => {
                 // Close mobile sidebar after loading
                 return true // Indicate success if needed
             } else {
-                showToast('Failed to load session', 'error')
+                // Session not found or other error
+                if (response.status === 404) {
+                    // Clear invalid session ID from state and localStorage
+                    sessionId.value = null
+                    showToast('会话不存在,已自动清除', 'error')
+                } else {
+                    showToast('Failed to load session', 'error')
+                }
             }
         } catch (err) {
             console.error('Failed to load session:', err)
@@ -902,6 +927,27 @@ export const useChat = () => {
                                     type: 'error',
                                     content: data
                                 })
+                                // Plan-ReAct: Display execution plan
+                                lastMsg.agentSteps.push({
+                                    type: 'plan',
+                                    content: 'Execution Plan',
+                                    planData: data
+                                })
+                            } else if (type === 'completion_check') {
+                                // Completion check result
+                                if (!data.is_complete) {
+                                    const checkInfo = [
+                                        `⚠️ **完成度检查:** 未完成 (置信度: ${(data.confidence * 100).toFixed(0)}%)`,
+                                        data.reasoning ? `原因: ${data.reasoning}` : '',
+                                        data.missing_items?.length ? `缺失: ${data.missing_items.join(', ')}` : '',
+                                        '继续执行...'
+                                    ]
+                                    lastMsg.agentSteps.push({
+                                        type: 'thought',
+                                        content: checkInfo.filter(Boolean).join('\n')
+                                    })
+                                }
+                                // If complete, no need to show anything - final answer will follow
                             }
 
                             if (shouldAutoScroll.value) {

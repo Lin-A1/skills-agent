@@ -38,7 +38,9 @@ class SandboxClient:
         language: str = "python",
         timeout: Optional[int] = None,
         env_vars: Optional[Dict[str, str]] = None,
-        trusted_mode: bool = False
+        trusted_mode: bool = False,
+        workspace_mount_path: Optional[str] = None,
+        session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         执行代码
@@ -50,6 +52,8 @@ class SandboxClient:
             env_vars: 环境变量
             trusted_mode: 信任模式 - 允许访问 services 模块和网络
                           开启后可以 from services.xxx.client import ...
+            workspace_mount_path: 工作区挂载路径 (e.g. /home/user/workspace)
+            session_id: 会话ID，用于隔离工作区。如果提供，将挂载 workspace_mount_path/session_id
 
         Returns:
             dict: 执行结果，包含 success, stdout, stderr, exit_code, execution_time
@@ -64,6 +68,10 @@ class SandboxClient:
             payload["timeout"] = timeout
         if env_vars is not None:
             payload["env_vars"] = env_vars
+        if workspace_mount_path is not None:
+            payload["workspace_mount_path"] = workspace_mount_path
+        if session_id is not None:
+            payload["session_id"] = session_id
         
         response = requests.post(url, json=payload, timeout=self.timeout)
         response.raise_for_status()

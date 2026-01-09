@@ -50,8 +50,8 @@ async def lifespan(app: FastAPI):
         vector_cache_manager = VectorCacheManager()
         vector_cache_manager.initialize()
         
-        # 初始化浏览器池
-        browser_pool = BrowserPool(pool_size=3)
+        # 初始化浏览器池（提高并发能力）
+        browser_pool = BrowserPool(pool_size=4)
         await browser_pool.initialize()
         
         # 初始化搜索分析器

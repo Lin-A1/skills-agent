@@ -120,12 +120,12 @@ class DeepSearchEngine:
         
         # HTTP 客户端（连接池优化）
         self.http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(120.0, connect=10.0),
-            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10)
+            timeout=httpx.Timeout(60.0, connect=10.0),  # 减少超时，更快失败
+            limits=httpx.Limits(max_connections=30, max_keepalive_connections=15)  # 增加连接池
         )
         
-        # LLM 并发限制
-        self.llm_semaphore = asyncio.Semaphore(3)
+        # LLM 并发限制（提高并发）
+        self.llm_semaphore = asyncio.Semaphore(5)
         
         # WebSearch 健康状态
         self._websearch_healthy = True
@@ -457,7 +457,7 @@ class DeepSearchEngine:
                 response = await self.http_client.post(
                     f"{self.websearch_url}/search",
                     json={"query": query, "max_results": max_results, "force_refresh": False},
-                    timeout=60.0
+                    timeout=30.0  # 减少超时，快速失败
                 )
                 response.raise_for_status()
                 data = response.json()

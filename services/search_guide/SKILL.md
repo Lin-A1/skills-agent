@@ -10,6 +10,14 @@ related_tools:
   - deepsearch_service
 ---
 
+### When NOT to Search 🚫
+- **General Knowledge**: History, geography, basic science, common facts.
+- **Coding & Algorithms**: Writing standard algorithms (sorting, DFS/BFS), boilerplate code, or using standard libraries (Python stdlib, React hooks). **TRUST YOUR TRAINING.**
+- **Creative Writing**: Poems, stories, essays, brainstorming.
+- **Logical Reasoning**: Math problems, riddles, analysis of provided text.
+- **Internal Context**: Information already provided in the prompt or conversation history.vice
+---
+
 ## 搜索工具使用规范
 
 ### ✅ 应该搜索的场景

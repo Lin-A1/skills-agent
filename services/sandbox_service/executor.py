@@ -68,7 +68,8 @@ class CodeExecutor:
         language: str = "python",
         timeout: Optional[int] = None,
         env_vars: Optional[Dict[str, str]] = None,
-        trusted_mode: bool = False
+        trusted_mode: bool = False,
+        workspace_mount_path: Optional[str] = None
     ) -> ExecutionResult:
         """
         执行代码
@@ -116,7 +117,8 @@ class CodeExecutor:
                 code=code,
                 env_vars=env_vars,
                 timeout=exec_timeout,
-                trusted_mode=trusted_mode
+                trusted_mode=trusted_mode,
+                workspace_mount_path=workspace_mount_path
             )
 
             
@@ -193,7 +195,8 @@ class CodeExecutor:
         code: str,
         env_vars: Optional[Dict[str, str]],
         timeout: int,
-        trusted_mode: bool = False
+        trusted_mode: bool = False,
+        workspace_mount_path: Optional[str] = None
     ) -> list:
         """
         构建 Docker 执行命令
@@ -202,6 +205,7 @@ class CodeExecutor:
             trusted_mode: 信任模式
                 - False: 严格隔离（无网络、只读）
                 - True: 允许访问 services 和网络
+            workspace_mount_path: 工作区挂载路径（宿主机路径），挂载到容器 /workspace
         """
         cmd = [
             "docker", "run",
@@ -248,6 +252,14 @@ class CodeExecutor:
                 "--user", "nobody",          # 非 root 用户
                 "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
             ])
+        
+        # 挂载工作区（如果有）
+        if workspace_mount_path:
+            # 挂载到 /workspace，读写权限
+            cmd.extend(["-v", f"{workspace_mount_path}:/workspace:rw"])
+            # 设置工作区为 /workspace (可选，如果希望默认在工作区执行)
+            # cmd.extend(["-w", "/workspace"])
+            logger.info(f"挂载工作区: {workspace_mount_path} -> /workspace")
         
         # 添加环境变量
         if env_vars:

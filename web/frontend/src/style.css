@@ -129,6 +129,19 @@
   @apply bg-stone-200 rounded-full hover:bg-stone-300 transition-colors;
 }
 
+/* Thin scrollbar variant for textareas */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply bg-stone-300 rounded-full hover:bg-stone-400;
+}
+
 /* Accessibility: Clear focus rings */
 :focus-visible {
   @apply outline-none ring-2 ring-[#334155] ring-offset-2 ring-offset-white;

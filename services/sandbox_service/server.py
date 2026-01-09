@@ -44,6 +44,8 @@ class ExecuteRequest(BaseModel):
         False, 
         description="信任模式：允许访问 services 模块和网络，可以 from services.xxx.client import ..."
     )
+    workspace_mount_path: Optional[str] = Field(None, description="工作区挂载路径")
+    session_id: Optional[str] = Field(None, description="会话ID，用于隔离工作区")
 
 
 
@@ -203,12 +205,25 @@ async def execute_code(request: ExecuteRequest):
         mode = "trusted" if request.trusted_mode else "isolated"
         logger.info(f"执行请求: language={request.language}, mode={mode}, code_length={len(request.code)}")
         
+        # 处理工作区挂载
+        mount_path = request.workspace_mount_path or os.getenv("WORKSPACE_MOUNT_PATH")
+        if mount_path and request.session_id:
+            # 如果提供了 session_id，则挂载子目录
+            mount_path = os.path.join(mount_path, request.session_id)
+            # 确保目录存在
+            if os.path.exists(os.getenv("WORKSPACE_MOUNT_PATH", "")) and not os.path.exists(mount_path):
+                 try:
+                     os.makedirs(mount_path, exist_ok=True)
+                 except OSError:
+                     pass
+        
         result = await executor.execute(
             code=request.code,
             language=request.language,
             timeout=request.timeout,
             env_vars=request.env_vars,
-            trusted_mode=request.trusted_mode
+            trusted_mode=request.trusted_mode,
+            workspace_mount_path=mount_path
         )
         
         return ExecuteResponse(

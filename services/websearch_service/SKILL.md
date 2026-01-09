@@ -1,12 +1,8 @@
 ---
 name: websearch_service
 description: |
-  联网搜索服务。**仅在以下情况使用**：
-  1. 用户明确要求搜索或查询最新信息
-  2. 需要验证不确定的事实或数据
-  3. 查询实时信息（新闻、股价、天气等）
-  4. 遇到不熟悉的专有名词或概念
-  **不要用于**：常识问题、编程技巧、通用知识问答
+  Use ONLY for retrieving **real-time information**, **specific facts**, **news**, **events**, and **unknown entities** (companies, products, people) that are NOT in your internal knowledge base.
+  **Strictly** for external/dynamic information retrieval.
 client_class: WebSearchClient
 default_method: search
 ---
