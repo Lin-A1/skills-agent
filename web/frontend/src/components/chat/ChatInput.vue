@@ -109,7 +109,7 @@ const triggerFileSelect = () => {
               :value="modelValue"
               @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
               ref="textareaRef"
-              @keydown.enter.exact.prevent="emit('submit')"
+              @keydown.enter.exact.prevent="status !== 'streaming' && emit('submit')"
               :placeholder="uploadedImages.length > 0 ? 'Describe image...' : 'Ask anything...'" 
               class="flex-1 border-0 focus:ring-0 shadow-none bg-transparent py-3 px-4 min-h-[56px] max-h-[200px] text-base placeholder:text-muted-foreground resize-none overflow-y-auto scrollbar-thin text-foreground outline-none font-medium leading-relaxed"
               :disabled="false"
@@ -119,7 +119,7 @@ const triggerFileSelect = () => {
 
             <Button 
               type="submit" 
-              :disabled="(!modelValue.trim() && uploadedImages.length === 0)"
+              :disabled="status === 'streaming' || (!modelValue.trim() && uploadedImages.length === 0)"
               size="icon"
               :class="[
                 'h-10 w-10 mb-1.5 mr-1.5 rounded-xl transition-all flex-shrink-0 shadow-md duration-200',

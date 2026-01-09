@@ -27,10 +27,3 @@ try:
     __all__.append("RerankServiceClient")
 except ImportError:
     pass
-
-# File Service 客户端
-try:
-    from .file_service.client import FileServiceClient
-    __all__.append("FileServiceClient")
-except ImportError:
-    pass

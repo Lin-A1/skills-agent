@@ -55,7 +55,7 @@ export const useChat = () => {
     const editingContent = ref('')
     const abortController = ref<AbortController | null>(null)
     const textareaRef = ref<HTMLTextAreaElement | null>(null)
-    const scrollContainerRef = ref<HTMLElement | null>(null)
+    const scrollContainerRef = ref<any>(null)
     const bottomRef = ref<HTMLElement | null>(null)
     const shouldAutoScroll = ref(true)
     const isLoadingSession = ref(false)
@@ -144,14 +144,15 @@ export const useChat = () => {
         if (!viewport) return
 
         const { scrollTop, scrollHeight, clientHeight } = viewport
-        const threshold = 150
+        // Use a 50px threshold to detect if the user is at the bottom
+        const threshold = 50
         const distanceFromBottom = scrollHeight - scrollTop - clientHeight
 
-        // User is near bottom - enable auto-scroll
-        if (distanceFromBottom < threshold) {
+        // If the user is at the bottom, stay in auto-scroll mode
+        if (distanceFromBottom <= threshold) {
             shouldAutoScroll.value = true
         } else {
-            // User scrolled away from bottom - disable auto-scroll
+            // User scrolled up, disable auto-scroll
             shouldAutoScroll.value = false
         }
     }
@@ -1065,15 +1066,6 @@ export const useChat = () => {
         }
 
         nextTick(() => {
-            // Bind scroll event to ScrollArea viewport
-            if (scrollContainerRef.value) {
-                const container = (scrollContainerRef.value as any).$el || scrollContainerRef.value
-                const viewport = container.querySelector('[data-radix-scroll-area-viewport]')
-                if (viewport) {
-                    viewport.addEventListener('scroll', checkScrollPosition)
-                }
-            }
-
             // Delegate click listener for code copy buttons
             document.addEventListener('click', async (e) => {
                 const target = (e.target as HTMLElement).closest('.copy-code-btn') as HTMLElement
@@ -1122,6 +1114,25 @@ export const useChat = () => {
         startNewSession()
         loadSessions()
     })
+
+    // Watch for scroll container to bind event
+    let currentViewport: HTMLElement | null = null
+    watch(scrollContainerRef, (newVal) => {
+        if (currentViewport) {
+            currentViewport.removeEventListener('scroll', checkScrollPosition as EventListener)
+        }
+
+        if (newVal) {
+            nextTick(() => {
+                const container = newVal.$el || newVal
+                const viewport = container.querySelector('[data-radix-scroll-area-viewport]')
+                if (viewport) {
+                    currentViewport = viewport
+                    viewport.addEventListener('scroll', checkScrollPosition as EventListener)
+                }
+            })
+        }
+    }, { immediate: true })
 
     return {
         messages,

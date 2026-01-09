@@ -177,11 +177,11 @@ Your documentation content here...
 - ✅ **Robust Agent Core**: Improved connection handling, automatic session title generation, and defensive programming against API failures.
 - ✅ **UI Enhancements**: Fixed message editing/regeneration flow, better error handling, and visualized "Thinking" state.
 - ✅ **Search Strategy**: Optimized "Knowledge First" rule - Agent prioritizes internal knowledge before searching.
-- ✅ **File Operation Service** (`file_service`): Capability to create, read, update, and delete files.
 - ✅ **Todo Management**: A skill to manage tasks and to-do lists.
 
 ### Roadmap
 
 - [ ] **Agent Workspace**: Dedicated file operation space allowing the Agent to manipulate files like an AI IDE.
+- [ ] **File Operation Service** (`file_service`): Capability to create, read, update, and delete files.
 ---
 

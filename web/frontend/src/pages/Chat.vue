@@ -17,7 +17,7 @@ const toggleSidebarDesktop = () => { isSidebarCollapsed.value = !isSidebarCollap
 const { 
   messages, input, handleSubmit, status, sessionId, sessions,
   startNewSession, loadSession: internalLoadSession, deleteSession,
-  bottomRef,
+  bottomRef, scrollContainerRef,
   copyMessage, copiedMessageId, editingMessageId, editingContent,
   startEdit, cancelEdit, saveEditAndRegenerate, stopGeneration,
   rollbackToMessage, isLoadingSession,
@@ -35,11 +35,18 @@ const loadSession = async (id: string) => {
   }
 }
 
-// Sync bottomRef for auto-scrolling
+// Sync refs for auto-scrolling
 const messageListRef = ref<InstanceType<typeof MessageList> | null>(null)
-watch(() => messageListRef.value?.bottomRef, (el) => {
-  if (el) {
-    bottomRef.value = el
+watch(() => messageListRef.value, (newVal) => {
+  if (newVal) {
+    // We sync the component instance or element for scroll container
+    if (newVal.scrollContainerRef) {
+      scrollContainerRef.value = newVal.scrollContainerRef
+    }
+    // We sync the bottom anchor element
+    if (newVal.bottomRef) {
+      bottomRef.value = newVal.bottomRef
+    }
   }
 }, { immediate: true })
 

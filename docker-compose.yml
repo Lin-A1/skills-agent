@@ -166,13 +166,11 @@ services:
       # 信任模式下容器挂载路径（宿主机绝对路径）
       - SERVICES_MOUNT_PATH=${PWD}/services
       - ENV_FILE_PATH=${PWD}/.env
-      - WORKSPACE_MOUNT_PATH=${PWD}/storage/workspace # 沙盒容器挂载的工作区
     volumes:
       - ./services/sandbox_service:/app
       - ./services:/app/services # 挂载 services 供信任模式使用
       - ./.env:/app/.env:ro # 挂载环境变量文件
       - /var/run/docker.sock:/var/run/docker.sock # Docker-in-Docker
-      - ./storage/workspace:/workspace # 挂载工作区到服务本身
     group_add:
       - "999" # docker 组 GID，用于访问 docker.sock
     restart: unless-stopped
@@ -290,7 +288,6 @@ services:
       - ./app/agent:/app/app/agent
       - ./services:/app/services
       - ./storage:/app/storage
-      - ./storage/workspace:/workspace # 挂载工作区
     restart: unless-stopped
     depends_on:
       pgsql:

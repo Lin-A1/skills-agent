@@ -267,7 +267,7 @@ if __name__ == "__main__":
             final_answer = ""
             
             async for event in client.stream_run(
-                message="计算mino-v2-flash和gemini 3 flash，这两个文本的文本相似度",
+                message="南宁的天气怎么样",
                 user_id="test_user"
             ):
                 event_type = event.get('type')

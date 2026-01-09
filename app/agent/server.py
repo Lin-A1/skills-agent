@@ -152,6 +152,7 @@ def main():
         host=settings.AGENT_SERVICE_HOST,
         port=settings.AGENT_SERVICE_PORT,
         reload=settings.AGENT_SERVICE_DEBUG,
+        reload_dirs=["/app/app", "/app/services"],
         log_level="debug" if settings.AGENT_SERVICE_DEBUG else "info"
     )
 
