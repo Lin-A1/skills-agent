@@ -116,7 +116,7 @@ class IntelligentSearchAnalyzer:
         )
         
         # 并发配置
-        self.max_concurrent_pages = 6
+        self.max_concurrent_pages = 4
 
         logger.info(
             f"初始化完成 - LLM模型: {self.llm_model}, "
@@ -270,7 +270,7 @@ class IntelligentSearchAnalyzer:
                 batch = search_links[i:i + self.max_concurrent_pages]
                 
                 if i > 0:
-                    await asyncio.sleep(random.uniform(0.3, 0.6))
+                    await asyncio.sleep(random.uniform(1.5, 3.0))
                 
                 tasks = [
                     self._process_single_page(browser, query, link["title"], link["url"], idx + i + 1)

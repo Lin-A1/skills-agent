@@ -23,33 +23,78 @@ logger = logging.getLogger(__name__)
 class PageFetcher:
     """网页内容获取器"""
     
-    # 反检测脚本
+    # 增强版反检测脚本
     ANTI_DETECTION_SCRIPT = """
+    // 1. Overwrite navigator.webdriver
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    Object.defineProperty(navigator, 'plugins', { 
-        get: () => [
-            {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer'},
-            {name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
-            {name: 'Native Client', filename: 'internal-nacl-plugin'}
-        ]
+    
+    // 2. Mock chrome object
+    window.chrome = {
+        runtime: {},
+        loadTimes: function() {},
+        csi: function() {},
+        app: {},
+        webview: {},
+    };
+    
+    // 3. Mock plugins
+    Object.defineProperty(navigator, 'plugins', {
+        get: () => {
+            var plugins = [];
+            plugins.item = function(index) { return this[index]; };
+            plugins.namedItem = function(name) { return this[name]; };
+            plugins.refresh = function() {};
+            
+            // Add some mock plugins
+            var pdfPlugin = {
+                name: 'Chrome PDF Plugin',
+                filename: 'internal-pdf-viewer',
+                description: 'Portable Document Format'
+            };
+            plugins.push(pdfPlugin);
+            return plugins;
+        }
     });
-    Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en-US', 'en'] });
-    window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
+    
+    // 4. Mock languages
+    Object.defineProperty(navigator, 'languages', {
+        get: () => ['zh-CN', 'zh', 'en-US', 'en']
+    });
+    
+    // 5. Mock permissions
     const originalQuery = window.navigator.permissions.query;
     window.navigator.permissions.query = (parameters) => (
         parameters.name === 'notifications' ?
         Promise.resolve({ state: Notification.permission }) :
         originalQuery(parameters)
     );
-    Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 1 });
-    Object.defineProperty(navigator, 'platform', { get: () => 'Linux x86_64' });
+    
+    // 6. WebGL Vendor/Renderer Mock (Optional but recommended)
+    const getParameter = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+        if (parameter === 37445) {
+            return 'Google Inc. (NVIDIA)';
+        }
+        if (parameter === 37446) {
+            return 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+        }
+        return getParameter(this, parameter);
+    };
     """
     
-    # User-Agent 列表
+    # 扩展的 User-Agent 列表
     USER_AGENTS = [
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        # Chrome / Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        # Chrome / macOS
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        # Firefox / Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+        # Edge / Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0",
     ]
     
     # 页面内容预检测的关键词
@@ -57,6 +102,7 @@ class PageFetcher:
         "请登录", "需要登录", "登录后查看", "请先登录",
         "VIP专享", "付费阅读", "开通会员", "订阅后查看",
         "验证码", "请输入验证码",
+        "Access Denied", "Captcha", "Security Check"
     ]
     
     AD_KEYWORDS = ["广告", "立即购买", "限时优惠", "点击下载"]
@@ -65,11 +111,11 @@ class PageFetcher:
         self,
         viewport_width: int = 1440,
         viewport_height: int = 900,
-        page_timeout: int = 15000,
+        page_timeout: int = 20000,  # 增加超时时间以适应模拟操作
         max_screenshot_height: int = 2500,
         device_scale_factor: int = 1,
-        min_page_delay: float = 0.1,
-        max_page_delay: float = 0.3
+        min_page_delay: float = 1.0,  # 增加最小延迟
+        max_page_delay: float = 3.0
     ):
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
@@ -81,18 +127,34 @@ class PageFetcher:
     
     async def create_context(self, browser: Browser):
         """创建浏览器上下文（带反检测）"""
+        user_agent = random.choice(self.USER_AGENTS)
+        
         context = await browser.new_context(
-            user_agent=random.choice(self.USER_AGENTS),
+            user_agent=user_agent,
             locale="zh-CN",
             timezone_id="Asia/Shanghai",
             viewport={"width": self.viewport_width, "height": self.viewport_height},
             device_scale_factor=self.device_scale_factor,
             ignore_https_errors=True,
             java_script_enabled=True,
-            has_touch=True,
+            has_touch=False,  # Desktop usually doesn't have touch
             is_mobile=False,
             color_scheme="light",
+            extra_http_headers={
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": '"Windows"',  # Should match User-Agent OS ideally, keeping simple for now
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+            }
         )
+        
+        # 注入初始化脚本
         await context.add_init_script(self.ANTI_DETECTION_SCRIPT)
         return context
     
@@ -112,13 +174,30 @@ class PageFetcher:
         page = await context.new_page()
         
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=self.page_timeout)
-            await asyncio.sleep(random.uniform(0.1, 0.4))
+            # 随机化视口大小，避免完全一致的指纹
+            width = self.viewport_width + random.randint(-50, 50)
+            height = self.viewport_height + random.randint(-50, 50)
+            await page.set_viewport_size({"width": width, "height": height})
+
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=self.page_timeout)
             
+            # 检查响应状态
+            if response and response.status >= 400:
+                logger.warning(f"页面返回错误状态码: {response.status} - {url}")
+                if response.status in [403, 429]: # Forbidden or Too Many Requests
+                     logger.warning("疑似被反爬拦截")
+            
+            # 等待网络闲置，但不要太久
             try:
-                await page.wait_for_load_state("networkidle", timeout=2000)
+                await page.wait_for_load_state("networkidle", timeout=3000)
             except Exception:
                 pass
+            
+            # 模拟人类行为 (随机鼠标移动、滚动)
+            await self._simulate_human_behavior(page)
+            
+            # 再次等待少量时间，确保动态内容加载
+            await asyncio.sleep(random.uniform(0.5, 1.5))
             
             # 并行提取文本和截图
             screenshot_task = self._capture_screenshot(page)
@@ -141,12 +220,45 @@ class PageFetcher:
             await context.close()
             return None, None, None
     
+    async def _simulate_human_behavior(self, page: Page):
+        """模拟人类操作行为：随机鼠标移动和滚动"""
+        try:
+            # 1. 随机鼠标移动
+            for _ in range(random.randint(2, 5)):
+                x = random.randint(100, self.viewport_width - 100)
+                y = random.randint(100, self.viewport_height - 100)
+                await page.mouse.move(x, y, steps=5)
+                await asyncio.sleep(random.uniform(0.1, 0.3))
+            
+            # 2. 随机滚动
+            # 滚动到底部再回滚一点
+            total_height = await page.evaluate("document.body.scrollHeight")
+            current_y = 0
+            while current_y < min(total_height, 2000): # 限制滚动深度
+                delta_y = random.randint(300, 700)
+                current_y += delta_y
+                await page.mouse.wheel(0, delta_y)
+                await asyncio.sleep(random.uniform(0.2, 0.5))
+                
+                # 偶尔停顿
+                if random.random() < 0.3:
+                    await asyncio.sleep(random.uniform(0.5, 1.0))
+            
+            # 滚回顶部以便截图
+            await page.evaluate("window.scrollTo(0, 0)")
+            await asyncio.sleep(0.5)
+            
+        except Exception as e:
+            logger.warning(f"模拟人类行为失败: {e}")
+
     async def close_page(self, page: Page):
         """关闭页面及其上下文"""
         try:
-            context = page.context
-            await page.close()
-            await context.close()
+            if not page.is_closed():
+                context = page.context
+                await page.close()
+                await context.close()
+            # 随机延迟，避免频繁请求
             await asyncio.sleep(random.uniform(self.min_page_delay, self.max_page_delay))
         except Exception as e:
             logger.warning(f"关闭页面时出错: {e}")
@@ -154,9 +266,8 @@ class PageFetcher:
     async def _capture_screenshot(self, page: Page) -> Optional[bytes]:
         """捕获页面截图"""
         try:
-            await page.wait_for_selector("body", timeout=self.page_timeout)
-            await page.evaluate("window.scrollTo(0, 0)")
-            await asyncio.sleep(0.4)
+            # 确保在截图前回到顶部 (在 simulate里面已经做了，这里再保险一次)
+            # await page.evaluate("window.scrollTo(0, 0)")
             
             page_height = await page.evaluate("document.body.scrollHeight")
             
@@ -181,14 +292,18 @@ class PageFetcher:
                         return el ? el.innerText.slice(0, maxLen).trim() : '';
                     };
                     const getMainText = () => {
-                        const selectors = ['article', 'main', '.content', '#content', '.article', '.post'];
+                        // 移除干扰元素
+                        const toRemove = ['script', 'style', 'noscript', 'iframe', 'header', 'footer', 'nav', '.ad', '.ads', '.advertisement'];
+                        toRemove.forEach(sel => document.querySelectorAll(sel).forEach(el => el.remove()));
+
+                        const selectors = ['article', 'main', '.content', '#content', '.article', '.post', '.news-detail'];
                         for (const sel of selectors) {
                             const el = document.querySelector(sel);
                             if (el && el.innerText.length > 200) {
-                                return el.innerText.slice(0, 3000).trim();
+                                return el.innerText.slice(0, 4000).trim();
                             }
                         }
-                        return document.body?.innerText?.slice(0, 3000).trim() || '';
+                        return document.body?.innerText?.slice(0, 4000).trim() || '';
                     };
                     return {
                         title: document.title || '',
@@ -214,17 +329,19 @@ class PageFetcher:
         
         main_text = extracted_text.get("main_text", "")
         
-        if len(main_text) < 100:
+        if len(main_text) < 50: # 稍微放宽长度限制
             return False, f"内容过短({len(main_text)}字符)"
         
         # 检测付费墙/登录墙
         for kw in self.PAYWALL_KEYWORDS:
             if kw in main_text:
-                return False, f"疑似付费墙/登录墙({kw})"
+                # 再次确认是否真的是阻断性提示，有些文章只是提到
+                if len(main_text) < 500: 
+                    return False, f"疑似付费墙/登录墙({kw})"
         
         # 检测广告页
         ad_count = sum(1 for kw in self.AD_KEYWORDS if kw in main_text)
-        if ad_count >= 3:
+        if ad_count >= 3 and len(main_text) < 800:
             return False, "疑似广告页"
         
         return True, "通过"

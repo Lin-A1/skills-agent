@@ -310,11 +310,7 @@ if __name__ == "__main__":
                 # 最终答案
                 elif event_type == 'final_answer':
                     final_answer = event_data
-                    print("\n" + "=" * 60)
-                    print("📋 最终答案")
-                    print("=" * 60)
-                    print(final_answer)
-                    print("=" * 60)
+                    print(final_answer, end='')
                 
                 # 完成
                 elif event_type == 'complete':

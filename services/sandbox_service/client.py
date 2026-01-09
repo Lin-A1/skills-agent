@@ -26,7 +26,7 @@ class SandboxClient:
         """
         if base_url is None:
             host = os.getenv("SANDBOX_SERVICE_HOST", "127.0.0.1")
-            port = os.getenv("SANDBOX_SERVICE_PORT", "8009")
+            port = os.getenv("SANDBOX_SERVICE_PORT", "8010")
             base_url = f"http://{host}:{port}"
 
         self.base_url = base_url.rstrip("/")
