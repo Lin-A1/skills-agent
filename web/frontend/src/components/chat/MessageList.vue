@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { 
   Bot, Brain, ChevronDown, Copy, BookOpen, RefreshCcw, 
-  CornerUpLeft, Pencil, Timer, Check, Wrench, SendIcon, Plus, ImageIcon, PenLine, Wand2
+  CornerUpLeft, Pencil, Timer, Check, Wrench, SendIcon, Plus, ImageIcon, PenLine, Wand2, X,
+  Globe, Terminal, Database, Link
 } from 'lucide-vue-next'
 import { renderMarkdown } from '@/lib/markdown'
 import AgentPlan from '@/components/AgentPlan.vue'
@@ -45,6 +46,55 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 
 // Initial empty state helpers
 const triggerImageUpload = () => fileInputRef.value?.click()
+
+// Helpers for visual timeline
+const getToolIcon = (name: string) => {
+  if (name.includes('search')) return Globe
+  if (name.includes('sandbox') || name.includes('bash') || name.includes('python')) return Terminal
+  if (name.includes('memory') || name.includes('session')) return Database
+  if (name.includes('web')) return Link
+  return Wrench
+}
+
+const getToolLabel = (name: string) => {
+  if (name === 'websearch_service') return 'Web Search'
+  if (name === 'sandbox_service') return 'Code Executor'
+  if (name === 'memory_service') return 'Memory'
+  if (name === 'deepsearch_service') return 'Deep Research'
+  return name.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+// Code block copy handler
+const handleCopyCode = async (e: MouseEvent) => {
+  const target = (e.target as HTMLElement).closest('.copy-code-btn')
+  if (!target) return
+  
+  const btn = target as HTMLButtonElement
+  const code = decodeURIComponent(btn.getAttribute('data-code') || '')
+  if (code) {
+    try {
+      await navigator.clipboard.writeText(code)
+      
+      // Visual feedback
+      const originalHTML = btn.innerHTML
+      btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-500"><polyline points="20 6 9 17 4 12"/></svg> Copied!`
+      
+      setTimeout(() => {
+        btn.innerHTML = originalHTML
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy', err)
+    }
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleCopyCode)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleCopyCode)
+})
 
 defineExpose({
   scrollContainerRef,
@@ -224,35 +274,67 @@ defineExpose({
                           </span>
                           <ChevronDown class="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-180 text-muted-foreground" />
                       </summary>
-                      <div class="px-3 pb-3 space-y-3 pt-1 border-t border-border mx-1 mt-1">
-                          <div v-for="(step, i) in msg.agentSteps.filter((s: AgentStep) => s.type !== 'plan')" :key="i" class="text-xs">
+                      <div class="px-3 pb-3 space-y-4 pt-2 border-t border-border mx-1 mt-1 relative">
+                          <!-- Timeline line -->
+                          <div class="absolute left-[19px] top-4 bottom-4 w-0.5 bg-border/50"></div>
+
+                          <div v-for="(step, i) in msg.agentSteps.filter((s: AgentStep) => s.type !== 'plan')" :key="i" class="text-xs relative pl-8 group/step">
+                              
+                              <!-- Dot on timeline -->
+                              <div class="absolute left-[14px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-background z-10 transition-colors duration-300"
+                                :class="{
+                                  'bg-muted-foreground/30': step.type === 'thought',
+                                  'bg-indigo-500': step.type === 'action',
+                                  'bg-emerald-500': step.type === 'observation',
+                                  'bg-red-500': step.type === 'error'
+                                }"></div>
+
                               <!-- Thought -->
-                              <div v-if="step.type === 'thought'" class="text-muted-foreground italic border-l-2 border-border pl-3 py-1">
+                              <div v-if="step.type === 'thought'" class="text-muted-foreground italic">
                                   {{ step.content }}
                               </div>
+
                               <!-- Action -->
-                              <div v-else-if="step.type === 'action'" class="bg-muted/30 rounded-lg p-2.5 border border-border text-foreground">
-                                  <div class="flex items-center gap-1.5 mb-1.5 text-indigo-600 font-bold">
-                                      <Wrench class="w-3 h-3" />
-                                      <span>Call: {{ step.toolName }}</span>
+                              <div v-else-if="step.type === 'action'" class="bg-background border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                  <div class="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border/50">
+                                      <!-- Tool Icon Logic -->
+                                      <component :is="getToolIcon(step.toolName || '')" class="w-3.5 h-3.5 text-indigo-600" />
+                                      <span class="font-medium text-foreground">{{ getToolLabel(step.toolName || '') }}</span>
+                                      <span class="text-[10px] bg-background border border-border px-1.5 py-0.5 rounded text-muted-foreground ml-auto font-mono">
+                                          {{ step.toolName }}
+                                      </span>
                                   </div>
-                                  <div class="bg-background rounded border border-border p-2 overflow-x-auto">
-                                      <pre class="font-mono text-[10px]">{{ JSON.stringify(step.toolInput, null, 2) }}</pre>
+                                  <div class="p-3 font-mono text-[11px] text-muted-foreground bg-slate-50/50 dark:bg-zinc-900/30 overflow-x-auto">
+                                      <!-- Better Args Display -->
+                                      <div v-for="(val, key) in step.toolInput" :key="key" class="flex items-start gap-2">
+                                          <span class="text-indigo-600/70 select-none">{{ key }}:</span>
+                                          <span class="text-foreground whitespace-pre-wrap break-all">{{ typeof val === 'string' ? val : JSON.stringify(val) }}</span>
+                                      </div>
                                   </div>
                               </div>
+
                               <!-- Observation -->
-                              <div v-else-if="step.type === 'observation'" class="bg-emerald-50/50 rounded-lg p-2.5 border border-emerald-100/50 text-foreground">
-                                  <div class="flex items-center gap-1.5 mb-1.5 text-emerald-600 font-bold">
-                                      <Check class="w-3 h-3" />
-                                      <span>Result</span>
+                              <div v-else-if="step.type === 'observation'" class="bg-background border border-border rounded-lg overflow-hidden relative">
+                                  <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/50 dark:bg-emerald-950/20 border-b border-emerald-100/50 dark:border-emerald-900/30">
+                                      <Check class="w-3 h-3 text-emerald-600" />
+                                      <span class="font-medium text-emerald-700 dark:text-emerald-400">Result</span>
                                   </div>
-                                  <div class="bg-background/50 rounded border border-emerald-100/50 p-2 overflow-x-auto max-h-40 scrollbar-thin">
-                                      <pre class="font-mono text-[10px] whitespace-pre-wrap">{{ step.content }}</pre>
+                                  <div class="p-3 font-mono text-[10px] text-muted-foreground max-h-32 overflow-y-auto scrollbar-thin">
+                                      <!-- Truncate large output -->
+                                      <div v-if="step.content.length > 500" class="relative">
+                                          {{ step.content.slice(0, 500) }}...
+                                          <div class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none"></div>
+                                      </div>
+                                      <div v-else>
+                                          {{ step.content }}
+                                      </div>
                                   </div>
                               </div>
+
                               <!-- Error -->
-                              <div v-else-if="step.type === 'error'" class="bg-red-50 text-destructive p-2 rounded border border-red-100 font-medium">
-                                  Error: {{ step.content }}
+                              <div v-else-if="step.type === 'error'" class="bg-red-50 dark:bg-red-950/20 text-destructive p-3 rounded-lg border border-red-100 dark:border-red-900/30 font-medium text-xs flex items-start gap-2">
+                                  <div class="mt-0.5"><X class="w-3.5 h-3.5" /></div>
+                                  <div>{{ step.content }}</div>
                               </div>
                           </div>
                       </div>

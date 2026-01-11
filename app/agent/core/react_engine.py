@@ -235,13 +235,25 @@ class ReActEngine:
                     # =========================================================
                     # 完成度检查 (Completion Check)
                     # =========================================================
-                    # 如果是 Action signal，我们没有 text answer，但可以用 thought 作为 current_answer 传给 check
-                    completion_result = await self._check_completion(
-                        task=task,
-                        plan=execution_plan,
-                        observations=observations,
-                        current_answer=str(final_answer_signal)
-                    )
+                    
+                    # 如果是 Action signal (Ready to answer)，说明 Agent 明确表示已完成并准备回答
+                    # 此时不需要进行文本完整性检查，直接认为完成
+                    if str(final_answer_signal) == "Ready to answer":
+                        completion_result = CompletionResult(
+                            is_complete=True,
+                            confidence=1.0,
+                            reasoning="Agent explicit final_answer signal",
+                            missing_items=[],
+                            suggested_next_steps=[]
+                        )
+                    else:
+                        # 否则对生成的答案文本进行检查
+                        completion_result = await self._check_completion(
+                            task=task,
+                            plan=execution_plan,
+                            observations=observations,
+                            current_answer=str(final_answer_signal)
+                        )
                     
                     # 发送完成度检查事件
                     yield AgentEvent(

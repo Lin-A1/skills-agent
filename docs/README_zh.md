@@ -91,7 +91,7 @@ myagent/
 
 1.  **克隆仓库**
     ```bash
-    git clone https://github.com/Lin-A1/myagent.git
+    git clone https://github.com/Lin-A1/skills-agent.git
     cd myagent
     ```
 

@@ -91,7 +91,7 @@ myagent/
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/Lin-A1/myagent.git
+    git clone https://github.com/Lin-A1/skills-agent.git
     cd myagent
     ```
 
