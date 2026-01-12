@@ -4,7 +4,6 @@ import {
 } from 'lucide-vue-next'
 
 defineProps<{
-  isAgentMode: boolean
   sessionId: string | null
   isSidebarCollapsed: boolean
   sidebarOpen: boolean
@@ -19,7 +18,7 @@ const emit = defineEmits<{
 <template>
   <header :class="[
     'fixed top-0 right-0 z-30 flex items-center justify-between px-4 h-14 border-b border-border backdrop-blur-xl transition-all duration-300 ease-in-out',
-    isAgentMode ? 'bg-background/90' : 'bg-background/90',
+    'bg-background/90',
     sidebarOpen ? 'left-0' : (isSidebarCollapsed ? 'left-0' : 'md:left-[280px] left-0')
   ]">
     <div class="flex items-center gap-3">

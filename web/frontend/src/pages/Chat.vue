@@ -22,7 +22,7 @@ const {
   startEdit, cancelEdit, saveEditAndRegenerate, stopGeneration,
   rollbackToMessage, isLoadingSession,
   toastMessage, toastType, regenerateFromMessage,
-  isAgentMode, searchQuery, showSearch,
+  searchQuery, showSearch,
   uploadedImages, fileInputRef, MAX_IMAGES, triggerImageUpload,
   handleImageSelect, removeImage, thinkingSeconds
 } = useChat()
@@ -71,7 +71,7 @@ const onFileSelected = (event: Event) => {
 </script>
 
 <template>
-  <div :class="['flex h-[100dvh] text-foreground font-sans selection:bg-muted', isAgentMode ? 'bg-muted/30' : 'bg-background']">
+  <div :class="['flex h-[100dvh] text-foreground font-sans selection:bg-muted', 'bg-background']">
     <!-- Toast Notification -->
     <Transition name="toast">
       <div v-if="toastMessage" 
@@ -85,7 +85,7 @@ const onFileSelected = (event: Event) => {
     </Transition>
     
     <!-- Loading Overlay -->
-    <div v-if="isLoadingSession" :class="['fixed inset-0 z-[90] flex items-center justify-center md:ml-[280px]', isAgentMode ? 'bg-muted/50' : 'bg-background/50']">
+    <div v-if="isLoadingSession" :class="['fixed inset-0 z-[90] flex items-center justify-center md:ml-[280px]', 'bg-background/50']">
       <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
     </div>
     
@@ -107,7 +107,7 @@ const onFileSelected = (event: Event) => {
     <main :class="[
         'flex-1 flex flex-col min-w-0 relative transition-all duration-300 ease-in-out pt-14',
         isSidebarCollapsed ? 'md:ml-0' : 'md:ml-[280px]',
-        isAgentMode ? 'bg-muted/30' : 'bg-muted/10'
+        'bg-muted/10'
     ]">
       <!-- Background Decor (Hidden on mobile for performance) -->
       <div class="hidden md:block fixed inset-0 pointer-events-none z-0">
@@ -116,7 +116,6 @@ const onFileSelected = (event: Event) => {
       </div>
 
       <ChatHeader 
-        :is-agent-mode="isAgentMode"
         :session-id="sessionId"
         :is-sidebar-collapsed="isSidebarCollapsed"
         :sidebar-open="sidebarOpen"
@@ -135,7 +134,6 @@ const onFileSelected = (event: Event) => {
         :copied-message-id="copiedMessageId"
         :max-images="MAX_IMAGES"
         :input="input"
-        v-model:is-agent-mode="isAgentMode"
         @update:input="input = $event"
         @submit="handleSubmit"
         @remove-image="removeImage"
@@ -155,7 +153,6 @@ const onFileSelected = (event: Event) => {
         v-model="input"
         :uploaded-images="uploadedImages"
         :status="status"
-        :is-agent-mode="isAgentMode"
         :is-sidebar-collapsed="isSidebarCollapsed"
         :max-images="MAX_IMAGES"
         @submit="handleSubmit"

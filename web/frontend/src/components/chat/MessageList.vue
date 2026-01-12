@@ -3,18 +3,17 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { 
-  Bot, Brain, ChevronDown, Copy, BookOpen, RefreshCcw, 
-  CornerUpLeft, Pencil, Timer, Check, Wrench, SendIcon, Plus, ImageIcon, PenLine, Wand2, X,
-  Globe, Terminal, Database, Link
+  Brain, ChevronDown, Copy, BookOpen, RefreshCcw, 
+  CornerUpLeft, Pencil, Check, SendIcon, Plus, ImageIcon, PenLine, Wand2, X
 } from 'lucide-vue-next'
 import { renderMarkdown } from '@/lib/markdown'
-import AgentPlan from '@/components/AgentPlan.vue'
-import type { ChatMessage, UploadedImage, AgentStep } from '@/composables/useChat'
+
+import type { ChatMessage, UploadedImage } from '@/composables/useChat'
 
 const props = defineProps<{
   messages: ChatMessage[]
   status: string
-  isAgentMode: boolean
+
   uploadedImages: UploadedImage[]
   thinkingSeconds: number
   editingMessageId: string | null
@@ -25,7 +24,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:isAgentMode', value: boolean): void
+
   (e: 'removeImage', index: number): void
   (e: 'triggerImageUpload'): void
   (e: 'handleImageSelect', event: Event): void
@@ -48,21 +47,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const triggerImageUpload = () => fileInputRef.value?.click()
 
 // Helpers for visual timeline
-const getToolIcon = (name: string) => {
-  if (name.includes('search')) return Globe
-  if (name.includes('sandbox') || name.includes('bash') || name.includes('python')) return Terminal
-  if (name.includes('memory') || name.includes('session')) return Database
-  if (name.includes('web')) return Link
-  return Wrench
-}
 
-const getToolLabel = (name: string) => {
-  if (name === 'websearch_service') return 'Web Search'
-  if (name === 'sandbox_service') return 'Code Executor'
-  if (name === 'memory_service') return 'Memory'
-  if (name === 'deepsearch_service') return 'Deep Research'
-  return name.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-}
 
 // Code block copy handler
 const handleCopyCode = async (e: MouseEvent) => {
@@ -112,21 +97,12 @@ defineExpose({
          <!-- Title -->
          <h2 class="text-3xl font-medium text-foreground mb-12 tracking-tight">How can I help you?</h2>
 
-         <!-- Agent Toggle (Prominent) -->
-         <div class="flex items-center gap-3 mb-6 bg-background/50 backdrop-blur-sm px-4 py-2 rounded-full border border-border shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer" @click="emit('update:isAgentMode', !isAgentMode)">
-             <div class="flex items-center gap-2">
-                 <span class="text-xs font-semibold uppercase tracking-wider transition-colors duration-300" :class="isAgentMode ? 'text-primary' : 'text-muted-foreground'">Agent Mode</span>
-                 <div class="w-8 h-5 rounded-full relative transition-colors duration-300" :class="isAgentMode ? 'bg-primary' : 'bg-muted'">
-                     <div class="absolute top-1 left-1 w-3 h-3 rounded-full bg-background shadow-sm transition-transform duration-300" :class="isAgentMode ? 'translate-x-3' : 'translate-x-0'"></div>
-                 </div>
-             </div>
-             <Bot class="w-4 h-4 transition-colors duration-300" :class="isAgentMode ? 'text-primary' : 'text-muted-foreground'" />
-         </div>
+
 
          <!-- Center Input Box -->
          <div class="w-full max-w-2xl relative group">
              <!-- Image Previews -->
-             <div v-if="uploadedImages.length > 0 && !isAgentMode" class="flex gap-2 mb-4 justify-center">
+             <div v-if="uploadedImages.length > 0" class="flex gap-2 mb-4 justify-center">
                 <div v-for="(img, index) in uploadedImages" :key="index" class="relative group/img">
                     <img :src="img.base64" class="w-16 h-16 object-cover rounded-xl border border-border shadow-sm" />
                     <button @click="emit('removeImage', index)" class="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center shadow-md hover:bg-destructive/90">
@@ -141,7 +117,7 @@ defineExpose({
              <div class="relative bg-background rounded-[2rem] shadow-xl shadow-primary/5 border border-border transition-all duration-300 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50">
                  <form @submit.prevent="emit('submit')" class="flex items-center p-2 pl-4">
                      <!-- Upload Button -->
-                     <Button v-if="!isAgentMode" type="button" variant="ghost" size="icon" @click="triggerImageUpload" :disabled="uploadedImages.length >= maxImages" class="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full w-10 h-10 flex-shrink-0">
+                     <Button type="button" variant="ghost" size="icon" @click="triggerImageUpload" :disabled="uploadedImages.length >= maxImages" class="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full w-10 h-10 flex-shrink-0">
                          <Plus class="w-5 h-5" />
                      </Button>
 
@@ -252,94 +228,7 @@ defineExpose({
             <div class="flex-1 min-w-0 space-y-2.5">
                 <div class="text-[13px] font-bold text-primary ml-1 tracking-wide uppercase opacity-70">Sage</div>
                 
-                <!-- Agent Plan (Always Visible) -->
-                <div v-if="msg.agentSteps && msg.agentSteps.some((s: AgentStep) => s.type === 'plan')" class="mb-4 space-y-2">
-                    <div v-for="(step, i) in msg.agentSteps.filter((s: AgentStep) => s.type === 'plan')" :key="'plan-'+i">
-                         <AgentPlan :plan="step.planData" />
-                    </div>
-                </div>
 
-                <!-- Agent Process/Thinking Block -->
-                <div v-if="msg.agentSteps && msg.agentSteps.some((s: AgentStep) => s.type !== 'plan')" class="mb-4">
-                  <details class="group bg-background/50 rounded-xl border border-border open:bg-background open:shadow-sm transition-all" :open="(index === messages.length - 1 && status === 'streaming') || (!msg.content && msg.agentSteps.some((s: AgentStep) => s.type !== 'plan'))">
-                      <summary class="flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground select-none list-none rounded-xl">
-                          <Brain class="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Thinking Process</span>
-                          <span class="ml-auto flex items-center gap-2 text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full group-open:hidden">
-                              <span v-if="status === 'streaming' && index === messages.length - 1" class="flex items-center gap-1">
-                                <Timer class="w-3 h-3" />
-                                {{ thinkingSeconds }}s
-                              </span>
-                              <span>{{ msg.agentSteps.filter((s: AgentStep) => s.type !== 'plan').length }} steps</span>
-                          </span>
-                          <ChevronDown class="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-180 text-muted-foreground" />
-                      </summary>
-                      <div class="px-3 pb-3 space-y-4 pt-2 border-t border-border mx-1 mt-1 relative">
-                          <!-- Timeline line -->
-                          <div class="absolute left-[19px] top-4 bottom-4 w-0.5 bg-border/50"></div>
-
-                          <div v-for="(step, i) in msg.agentSteps.filter((s: AgentStep) => s.type !== 'plan')" :key="i" class="text-xs relative pl-8 group/step">
-                              
-                              <!-- Dot on timeline -->
-                              <div class="absolute left-[14px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-background z-10 transition-colors duration-300"
-                                :class="{
-                                  'bg-muted-foreground/30': step.type === 'thought',
-                                  'bg-indigo-500': step.type === 'action',
-                                  'bg-emerald-500': step.type === 'observation',
-                                  'bg-red-500': step.type === 'error'
-                                }"></div>
-
-                              <!-- Thought -->
-                              <div v-if="step.type === 'thought'" class="text-muted-foreground italic">
-                                  {{ step.content }}
-                              </div>
-
-                              <!-- Action -->
-                              <div v-else-if="step.type === 'action'" class="bg-background border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                                  <div class="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border/50">
-                                      <!-- Tool Icon Logic -->
-                                      <component :is="getToolIcon(step.toolName || '')" class="w-3.5 h-3.5 text-indigo-600" />
-                                      <span class="font-medium text-foreground">{{ getToolLabel(step.toolName || '') }}</span>
-                                      <span class="text-[10px] bg-background border border-border px-1.5 py-0.5 rounded text-muted-foreground ml-auto font-mono">
-                                          {{ step.toolName }}
-                                      </span>
-                                  </div>
-                                  <div class="p-3 font-mono text-[11px] text-muted-foreground bg-slate-50/50 dark:bg-zinc-900/30 overflow-x-auto">
-                                      <!-- Better Args Display -->
-                                      <div v-for="(val, key) in step.toolInput" :key="key" class="flex items-start gap-2">
-                                          <span class="text-indigo-600/70 select-none">{{ key }}:</span>
-                                          <span class="text-foreground whitespace-pre-wrap break-all">{{ typeof val === 'string' ? val : JSON.stringify(val) }}</span>
-                                      </div>
-                                  </div>
-                              </div>
-
-                              <!-- Observation -->
-                              <div v-else-if="step.type === 'observation'" class="bg-background border border-border rounded-lg overflow-hidden relative">
-                                  <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/50 dark:bg-emerald-950/20 border-b border-emerald-100/50 dark:border-emerald-900/30">
-                                      <Check class="w-3 h-3 text-emerald-600" />
-                                      <span class="font-medium text-emerald-700 dark:text-emerald-400">Result</span>
-                                  </div>
-                                  <div class="p-3 font-mono text-[10px] text-muted-foreground max-h-32 overflow-y-auto scrollbar-thin">
-                                      <!-- Truncate large output -->
-                                      <div v-if="step.content.length > 500" class="relative">
-                                          {{ step.content.slice(0, 500) }}...
-                                          <div class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none"></div>
-                                      </div>
-                                      <div v-else>
-                                          {{ step.content }}
-                                      </div>
-                                  </div>
-                              </div>
-
-                              <!-- Error -->
-                              <div v-else-if="step.type === 'error'" class="bg-red-50 dark:bg-red-950/20 text-destructive p-3 rounded-lg border border-red-100 dark:border-red-900/30 font-medium text-xs flex items-start gap-2">
-                                  <div class="mt-0.5"><X class="w-3.5 h-3.5" /></div>
-                                  <div>{{ step.content }}</div>
-                              </div>
-                          </div>
-                      </div>
-                  </details>
-                </div>
 
                 <!-- Reasoning Block for Non-Agent Models -->
                 <div v-if="msg.reasoning" class="mb-4">

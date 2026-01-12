@@ -61,32 +61,13 @@ export const useChat = () => {
     const isLoadingSession = ref(false)
     const toastMessage = ref('')
     const toastType = ref<'success' | 'error'>('success')
-    const isAgentMode = ref(false)
-    const showKnowledgePanel = ref(false)
-    const knowledgeSpace = ref<any>(null)
-    const isLoadingKnowledge = ref(false)
+
     const searchQuery = ref('')
     const showSearch = ref(false)
 
-    // Thinking timer state
+    // Thinking timer state - minimal implementation for UI compatibility
     const thinkingSeconds = ref(0)
-    let thinkingTimer: number | null = null
-
-    const startThinkingTimer = () => {
-        stopThinkingTimer()
-        thinkingSeconds.value = 0
-        thinkingTimer = window.setInterval(() => {
-            thinkingSeconds.value++
-        }, 1000)
-    }
-
-    const stopThinkingTimer = () => {
-        if (thinkingTimer) {
-            clearInterval(thinkingTimer)
-            thinkingTimer = null
-        }
-        thinkingSeconds.value = 0
-    }
+    // Timer functions removed as they were agent-specific
 
     // 图片上传相关
     const uploadedImages = ref<{ base64: string; name: string }[]>([])
@@ -94,18 +75,7 @@ export const useChat = () => {
     const MAX_IMAGES = 3
     const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
 
-    // Load knowledge space - DISABLED (API removed)
-    const loadKnowledgeSpace = async () => {
-        // Knowledge space API has been removed
-        // This function is kept for backwards compatibility
-        knowledgeSpace.value = null
-    }
 
-    // Add user fact - DISABLED (API removed)
-    const addFact = async (_content: string, _category: string) => {
-        // Knowledge space API has been removed
-        showToast('此功能已禁用', 'error')
-    }
 
     // Show toast notification
     const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -161,7 +131,6 @@ export const useChat = () => {
 
     // Trigger file input click
     const triggerImageUpload = () => {
-        if (isAgentMode.value) return // Agent mode doesn't support images
         fileInputRef.value?.click()
     }
 
@@ -225,9 +194,6 @@ export const useChat = () => {
     const loadSessions = async () => {
         try {
             let url = '/api/chat/sessions?page_size=20'
-            if (isAgentMode.value) {
-                url = '/api/agent/sessions?user_id=anonymous&limit=20'
-            }
             const response = await fetch(url)
             if (response.ok) {
                 const data = await response.json()
@@ -238,7 +204,7 @@ export const useChat = () => {
         }
     }
 
-    // Load messages from a session (supports both Chat and Agent modes)
+    // Load messages from a session
     const loadSession = async (id: string) => {
         // Abort any ongoing streaming before switching
         if (abortController.value) {
@@ -250,119 +216,22 @@ export const useChat = () => {
 
         try {
             let url = `/api/chat/sessions/${id}/messages`
-            if (isAgentMode.value) {
-                url = `/api/agent/sessions/${id}?user_id=anonymous`
-            }
             const response = await fetch(url)
             if (response.ok) {
                 const data = await response.json()
                 sessionId.value = id
 
-                // Agent API returns messages directly in data.messages
-                // Chat API returns messages in data.messages too
+                // Chat API returns messages in data.messages
                 const rawMessages = data.messages || []
 
-                if (isAgentMode.value) {
-                    // For Agent mode, reconstruct messages with agentSteps
-                    const reconstructedMessages: ChatMessage[] = []
-                    let currentSteps: AgentStep[] = []
-
-                    for (const m of rawMessages) {
-                        if (m.role === 'user') {
-                            // User message - push directly
-                            reconstructedMessages.push({
-                                id: m.id,
-                                role: 'user',
-                                content: m.content,
-                                createdAt: m.created_at
-                            } as ChatMessage)
-                            currentSteps = [] // Reset steps for new conversation turn
-                        } else if (m.role === 'tool') {
-                            // Tool message - convert to agent step
-                            const toolResult = m.tool_result || {}
-                            if (m.content?.includes('[思考]')) {
-                                // This is actually a thought stored as tool message
-                                currentSteps.push({
-                                    type: 'thought',
-                                    content: m.content.replace('[思考] ', '')
-                                })
-                            } else if (m.content?.includes('[调用工具:')) {
-                                // Action
-                                currentSteps.push({
-                                    type: 'action',
-                                    content: '',
-                                    toolName: m.tool_name || 'Unknown',
-                                    toolInput: toolResult.action || {}
-                                })
-                            } else if (m.content?.includes('[工具结果:')) {
-                                // Observation
-                                currentSteps.push({
-                                    type: 'observation',
-                                    content: JSON.stringify(toolResult, null, 2)
-                                })
-                            }
-                        } else if (m.role === 'assistant') {
-                            // Check if this is a thought message
-                            if (m.content?.startsWith('[思考]')) {
-                                currentSteps.push({
-                                    type: 'thought',
-                                    content: m.content.replace('[思考] ', '')
-                                })
-                            } else if (m.content?.startsWith('[执行计划]')) {
-                                try {
-                                    const planJson = m.content.replace('[执行计划] ', '')
-                                    const planData = JSON.parse(planJson)
-                                    currentSteps.push({
-                                        type: 'plan',
-                                        content: 'Execution Plan',
-                                        planData: planData
-                                    })
-                                } catch (e) {
-                                    console.error('Failed to parse plan from history', e)
-                                }
-                            } else {
-                                // Final answer - attach accumulated steps
-                                reconstructedMessages.push({
-                                    id: m.id,
-                                    role: 'assistant',
-                                    content: m.content,
-                                    agentSteps: currentSteps.length > 0 ? [...currentSteps] : undefined,
-                                    createdAt: m.created_at
-                                } as ChatMessage)
-                                currentSteps = [] // Reset for next turn
-                            }
-                        }
-                    }
-
-                    // If there are remaining steps (e.g. interrupted session without final answer), add a placeholder message
-                    if (currentSteps.length > 0) {
-                        reconstructedMessages.push({
-                            id: 'interrupted-' + Date.now(),
-                            role: 'assistant',
-                            content: '', // Empty content will trigger "(No response generated)" logic in UI
-                            agentSteps: [...currentSteps],
-                            createdAt: new Date().toISOString()
-                        } as ChatMessage)
-                    }
-
-                    // Treat explicit "(No response generated)" content as empty to show placeholder style
-                    reconstructedMessages.forEach(msg => {
-                        if (msg.role === 'assistant' && msg.content === '(No response generated)') {
-                            msg.content = ''
-                        }
-                    })
-
-                    messages.value = reconstructedMessages
-                } else {
-                    // Chat mode - simple mapping
-                    messages.value = rawMessages.map((m: any) => ({
-                        id: m.id,
-                        role: m.role,
-                        content: m.content,
-                        reasoning: m.extra_data?.reasoning,
-                        createdAt: m.created_at
-                    }))
-                }
+                messages.value = rawMessages.map((m: any) => ({
+                    id: m.id,
+                    role: m.role,
+                    content: m.content,
+                    reasoning: m.extra_data?.reasoning,
+                    images: m.images,
+                    createdAt: m.created_at
+                }))
 
                 await nextTick()
                 scrollToBottom()
@@ -406,9 +275,6 @@ export const useChat = () => {
     const deleteSession = async (id: string) => {
         try {
             let url = `/api/chat/sessions/${id}`
-            if (isAgentMode.value) {
-                url = `/api/agent/sessions/${id}`
-            }
             const response = await fetch(url, { method: 'DELETE' })
             if (response.ok) {
                 sessions.value = sessions.value.filter(s => s.id !== id)
@@ -459,35 +325,20 @@ export const useChat = () => {
         // 1. Delete this message and all messages after it from backend
         let deleteSuccess = true
         if (sessionId.value && targetMsg.id) {
-            if (isAgentMode.value) {
-                try {
-                    const response = await fetch(`/api/agent/sessions/${sessionId.value}/messages/${targetMsg.id}?include_following=true`, {
-                        method: 'DELETE'
-                    })
-                    if (!response.ok) {
-                        console.error('Delete API returned error:', response.status)
-                        deleteSuccess = false
-                    }
-                } catch (err) {
-                    console.error('Failed to delete messages in agent mode:', err)
-                    deleteSuccess = false
-                }
-            } else {
-                // Chat mode: delete one by one
-                for (let i = messages.value.length - 1; i >= msgIndex; i--) {
-                    const msg = messages.value[i]
-                    if (msg && msg.id) {
-                        try {
-                            const response = await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
-                                method: 'DELETE'
-                            })
-                            if (!response.ok) {
-                                deleteSuccess = false
-                            }
-                        } catch (err) {
-                            console.error('Failed to delete message:', err)
+            // Chat mode: delete one by one
+            for (let i = messages.value.length - 1; i >= msgIndex; i--) {
+                const msg = messages.value[i]
+                if (msg && msg.id) {
+                    try {
+                        const response = await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
+                            method: 'DELETE'
+                        })
+                        if (!response.ok) {
                             deleteSuccess = false
                         }
+                    } catch (err) {
+                        console.error('Failed to delete message:', err)
+                        deleteSuccess = false
                     }
                 }
             }
@@ -516,7 +367,7 @@ export const useChat = () => {
             abortController.value.abort()
             abortController.value = null
             status.value = 'idle'
-            stopThinkingTimer()
+
         }
     }
 
@@ -527,27 +378,16 @@ export const useChat = () => {
 
         // Delete this message and all messages after it from backend
         if (sessionId.value) {
-            if (isAgentMode.value) {
-                // Agent mode: single cascading delete
-                try {
-                    await fetch(`/api/agent/sessions/${sessionId.value}/messages/${msgId}?include_following=true`, {
-                        method: 'DELETE'
-                    })
-                } catch (err) {
-                    console.error('Failed to delete messages in agent mode:', err)
-                }
-            } else {
-                // Chat mode: delete one by one (reverse order)
-                for (let i = messages.value.length - 1; i >= msgIndex; i--) {
-                    const msg = messages.value[i]
-                    if (msg && msg.id) {
-                        try {
-                            await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
-                                method: 'DELETE'
-                            })
-                        } catch (err) {
-                            console.error('Failed to delete message:', err)
-                        }
+            // Chat mode: delete one by one (reverse order)
+            for (let i = messages.value.length - 1; i >= msgIndex; i--) {
+                const msg = messages.value[i]
+                if (msg && msg.id) {
+                    try {
+                        await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
+                            method: 'DELETE'
+                        })
+                    } catch (err) {
+                        console.error('Failed to delete message:', err)
                     }
                 }
             }
@@ -576,31 +416,16 @@ export const useChat = () => {
 
         // Delete all assistant messages after the last user message from backend
         if (sessionId.value) {
-            if (isAgentMode.value) {
-                // Agent mode: delete starting from the first message to be removed
-                // We find the first message after lastUserMsgIndex
-                const firstMsgToDelete = messages.value[lastUserMsgIndex + 1]
-                if (firstMsgToDelete && firstMsgToDelete.id) {
+            // Chat mode: delete one by one
+            for (let i = messages.value.length - 1; i > lastUserMsgIndex; i--) {
+                const msg = messages.value[i]
+                if (msg && msg.role === 'assistant' && msg.id) {
                     try {
-                        await fetch(`/api/agent/sessions/${sessionId.value}/messages/${firstMsgToDelete.id}?include_following=true`, {
+                        await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
                             method: 'DELETE'
                         })
                     } catch (err) {
-                        console.error('Failed to delete messages in agent mode:', err)
-                    }
-                }
-            } else {
-                // Chat mode: delete one by one
-                for (let i = messages.value.length - 1; i > lastUserMsgIndex; i--) {
-                    const msg = messages.value[i]
-                    if (msg && msg.role === 'assistant' && msg.id) {
-                        try {
-                            await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
-                                method: 'DELETE'
-                            })
-                        } catch (err) {
-                            console.error('Failed to delete message:', err)
-                        }
+                        console.error('Failed to delete message:', err)
                     }
                 }
             }
@@ -618,11 +443,6 @@ export const useChat = () => {
 
     // Regenerate from a specific user message
     const regenerateFromMessage = async (userMsg: ChatMessage, skipSaveUserMessage = false) => {
-        if (isAgentMode.value) {
-            await streamAgentRun(userMsg)
-            return
-        }
-
         status.value = 'streaming'
         abortController.value = new AbortController()
 
@@ -641,7 +461,7 @@ export const useChat = () => {
         try {
             const requestBody: Record<string, any> = {
                 message: userMsg.content,
-                stream: true,
+                stream: true, // Only stream
                 skip_save_user_message: skipSaveUserMessage
             }
 
@@ -649,8 +469,8 @@ export const useChat = () => {
                 requestBody.session_id = sessionId.value
             }
 
-            // 添加图片（仅非 Agent 模式）
-            if (!isAgentMode.value && uploadedImages.value.length > 0) {
+            // 添加图片
+            if (uploadedImages.value.length > 0) {
                 requestBody.images = uploadedImages.value.map(img => img.base64)
                 clearImages() // 发送后清空图片
             }
@@ -760,10 +580,6 @@ export const useChat = () => {
                     showToast(`错误: ${err instanceof Error ? err.message : '未知错误'}`, 'error')
                     if (errorMsg) {
                         errorMsg.content = `Error: ${err instanceof Error ? err.message : 'Unknown error'}`
-                        errorMsg.agentSteps = [{
-                            type: 'error',
-                            content: err instanceof Error ? err.message : 'Unknown error'
-                        }]
                     }
                 }
             } else {
@@ -774,217 +590,14 @@ export const useChat = () => {
             }
         } finally {
             status.value = 'idle'
-            stopThinkingTimer()
+
             abortController.value = null
             await nextTick()
             mermaid.run({ querySelector: '.language-mermaid' })
-            // Attempt to refresh knowledge space after run
-            if (knowledgeSpace.value) {
-                loadKnowledgeSpace()
-            }
         }
     }
 
-    // Stream output from Agent API
-    const streamAgentRun = async (userMsg: ChatMessage) => {
-        status.value = 'streaming'
-        startThinkingTimer()
-        abortController.value = new AbortController()
 
-        // 立即创建一个空的 assistant 消息以显示思考动画
-        const assistantMsgId = (Date.now() + 1).toString()
-        messages.value.push({
-            id: assistantMsgId,
-            role: 'assistant',
-            content: '',
-            agentSteps: []
-        })
-
-        await nextTick()
-        scrollToBottom()
-
-        try {
-            const requestBody: Record<string, any> = {
-                message: userMsg.content,
-                stream: true,
-                max_iterations: 10
-            }
-
-            if (sessionId.value) {
-                requestBody.session_id = sessionId.value
-            }
-
-            const response = await fetch('/api/agent/run', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody),
-                signal: abortController.value.signal
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}))
-                throw new Error(errorData.detail || `HTTP ${response.status}`)
-            }
-
-            if (!response.body) throw new Error('No response body')
-
-            const reader = response.body.getReader()
-            const decoder = new TextDecoder()
-
-            let fullContent = '' // We build the final answer here
-            let buffer = ''
-
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-
-                buffer += decoder.decode(value, { stream: true })
-                const lines = buffer.split('\n')
-                buffer = lines.pop() || ''
-
-                for (const line of lines) {
-                    const trimmed = line.trim()
-                    if (!trimmed || !trimmed.startsWith('data:')) continue
-
-                    const dataStr = trimmed.slice(5).trim()
-                    if (dataStr === '[DONE]') continue
-
-                    try {
-                        const event = JSON.parse(dataStr)
-                        // event format: { type: "start"|"thought"|"action"|"observation"|"final_answer"|"error", data: ... }
-
-                        const type = event.type
-                        const data = event.data
-
-                        // Handle START event - update user message ID with real UUID
-                        if (type === 'start' && data) {
-                            if (data.session_id && !sessionId.value) {
-                                sessionId.value = data.session_id
-                                loadSessions()
-                            }
-                            // Update user message ID with the real UUID from backend
-                            if (data.user_message_id) {
-                                const userMsgIndex = messages.value.length - 2 // User message is second to last
-                                if (userMsgIndex >= 0 && messages.value[userMsgIndex]?.role === 'user') {
-                                    messages.value[userMsgIndex].id = data.user_message_id
-                                }
-                            }
-                            continue
-                        }
-
-                        const lastMsg = messages.value[messages.value.length - 1]
-                        if (lastMsg && lastMsg.id === assistantMsgId) {
-                            if (!lastMsg.agentSteps) lastMsg.agentSteps = []
-
-                            // Capture session_id if present in any event (e.g. intent)
-                            if (data && data.session_id && !sessionId.value) {
-                                sessionId.value = data.session_id
-                                // Reload sessions to update list
-                                loadSessions()
-                            }
-
-                            if (type === 'thought') {
-                                lastMsg.agentSteps.push({
-                                    type: 'thought',
-                                    content: data
-                                })
-                            } else if (type === 'action') {
-                                // data is usually { name: "tool", input: "..." }
-                                const toolName = data.name || data.tool || 'Unknown Tool'
-                                const toolInput = data.arguments || data.input || data
-
-                                lastMsg.agentSteps.push({
-                                    type: 'action',
-                                    content: '', // Tool action doesn't have text content usually, essentially structured
-                                    toolName,
-                                    toolInput
-                                })
-                            } else if (type === 'observation') {
-                                let obsData = data
-                                // Try to unwrap
-                                if (typeof data === 'object' && data !== null) {
-                                    if (data.output) obsData = data.output
-                                    else if (data.result) obsData = data.result
-                                }
-
-                                const obsStr = typeof obsData === 'string' ? obsData : JSON.stringify(obsData, null, 2)
-
-                                lastMsg.agentSteps.push({
-                                    type: 'observation',
-                                    content: obsStr
-                                })
-
-                            } else if (type === 'final_answer') {
-                                // This is the actual text to show as the final answer
-                                if (lastMsg.content === '') {
-                                    // First chunk
-                                    fullContent = data
-                                } else {
-                                    fullContent += data // Append
-                                }
-                                lastMsg.content = fullContent
-                            } else if (type === 'error') {
-                                lastMsg.agentSteps.push({
-                                    type: 'error',
-                                    content: data
-                                })
-                                // Plan-ReAct: Display execution plan
-                                lastMsg.agentSteps.push({
-                                    type: 'plan',
-                                    content: 'Execution Plan',
-                                    planData: data
-                                })
-                            } else if (type === 'completion_check') {
-                                // Completion check result
-                                if (!data.is_complete) {
-                                    const checkInfo = [
-                                        `⚠️ **完成度检查:** 未完成 (置信度: ${(data.confidence * 100).toFixed(0)}%)`,
-                                        data.reasoning ? `原因: ${data.reasoning}` : '',
-                                        data.missing_items?.length ? `缺失: ${data.missing_items.join(', ')}` : '',
-                                        '继续执行...'
-                                    ]
-                                    lastMsg.agentSteps.push({
-                                        type: 'thought',
-                                        content: checkInfo.filter(Boolean).join('\n')
-                                    })
-                                }
-                                // If complete, no need to show anything - final answer will follow
-                            }
-
-                            if (shouldAutoScroll.value) {
-                                scrollToBottom()
-                            }
-
-                        }
-
-                    } catch (e) {
-                        console.warn("Error parsing SSE event:", e)
-                    }
-                }
-            }
-        } catch (err) {
-            if ((err as Error).name === 'AbortError') {
-                showToast('Agent 任务已停止', 'success')
-            } else {
-                console.error('Agent error:', err)
-                showToast(`Agent Error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
-                messages.value.push({
-                    id: Date.now().toString(),
-                    role: 'assistant',
-                    content: `\n\n**System Error**: ${err instanceof Error ? err.message : 'Unknown error'}`
-                })
-            }
-        } finally {
-            status.value = 'idle'
-            abortController.value = null
-            await nextTick()
-            mermaid.run({ querySelector: '.language-mermaid' })
-            // Attempt to refresh knowledge space after run
-            if (knowledgeSpace.value) {
-                loadKnowledgeSpace()
-            }
-        }
-    }
 
     const handleSubmit = async (e?: Event) => {
         e?.preventDefault()
@@ -1108,12 +721,7 @@ export const useChat = () => {
         scrollToBottom()
     })
 
-    // Watch for agent mode changes to reload sessions
-    watch(isAgentMode, () => {
-        // When mode changes, clear current session and reload session list
-        startNewSession()
-        loadSessions()
-    })
+
 
     // Watch for scroll container to bind event
     let currentViewport: HTMLElement | null = null
@@ -1163,14 +771,8 @@ export const useChat = () => {
         toastType,
         showToast,
         regenerateFromMessage,
-        isAgentMode,
-        showKnowledgePanel,
-        knowledgeSpace,
-        isLoadingKnowledge,
         searchQuery,
         showSearch,
-        loadKnowledgeSpace,
-        addFact,
         // 图片上传相关
         uploadedImages,
         fileInputRef,

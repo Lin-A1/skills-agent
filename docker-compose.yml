@@ -265,41 +265,7 @@ services:
       retries: 3
       start_period: 30s
 
-  # Agent 智能体服务
-  agent:
-    build:
-      context: .
-      dockerfile: app/agent/Dockerfile
-    container_name: agent_app
-    ports:
-      - "${AGENT_SERVICE_PORT:-8020}:${AGENT_SERVICE_PORT:-8020}"
-    env_file:
-      - .env
-    environment:
-      - PGSQL_HOST=pgsql
-      - PGSQL_PORT=5432
-      - SANDBOX_SERVICE_HOST=sandbox_service
-      - SEARCH_SERVICE_HOST=websearch_service
-      - DEEPSEARCH_SERVICE_HOST=deepsearch_service
-      - RAG_HOST=rag_service
-      - EMBEDDING_HOST=embedding_service
-      - RERANK_HOST=rerank_service
-    volumes:
-      - ./app/agent:/app/app/agent
-      - ./services:/app/services
-      - ./storage:/app/storage
-    restart: unless-stopped
-    depends_on:
-      pgsql:
-        condition: service_healthy
-      sandbox_service:
-        condition: service_healthy
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${AGENT_SERVICE_PORT:-8020}/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+
 
 networks:
   default:

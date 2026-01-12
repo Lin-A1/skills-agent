@@ -10,7 +10,6 @@ const props = defineProps<{
   modelValue: string
   uploadedImages: UploadedImage[]
   status: string
-  isAgentMode: boolean
   isSidebarCollapsed: boolean
   maxImages: number
 }>()
@@ -47,7 +46,7 @@ const triggerFileSelect = () => {
 <template>
   <div :class="[
       'p-6 fixed bottom-0 right-0 z-20 pointer-events-none transition-all duration-300 ease-in-out',
-      isAgentMode ? 'bg-gradient-to-t from-background via-background/90 to-transparent' : 'bg-gradient-to-t from-background via-background/90 to-transparent',
+      'bg-gradient-to-t from-background via-background/90 to-transparent',
       isSidebarCollapsed ? 'left-0' : 'left-0 md:left-[280px]'
   ]">
     <div class="max-w-3xl mx-auto pointer-events-auto">
@@ -61,7 +60,7 @@ const triggerFileSelect = () => {
       
       <div class="relative group">
          <!-- Image Preview -->
-         <div v-if="uploadedImages.length > 0 && !isAgentMode" class="flex gap-2 mb-2 px-2">
+         <div v-if="uploadedImages.length > 0" class="flex gap-2 mb-2 px-2">
            <div v-for="(img, index) in uploadedImages" :key="index" class="relative group/img">
              <img 
                :src="img.base64" 
@@ -90,7 +89,6 @@ const triggerFileSelect = () => {
          <form @submit.prevent="emit('submit')" class="relative glass-input rounded-2xl shadow-soft-lg flex items-end p-2.5 transition-all">
             <!-- Upload Button (Non-Agent Mode) -->
             <Button 
-              v-if="!isAgentMode"
               type="button"
               variant="ghost"
               size="icon"
