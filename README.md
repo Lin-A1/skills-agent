@@ -63,16 +63,15 @@ description: 基于 SearXNG 与 VLM 的实时联网搜索服务
 通过 SearXNG 搜索引擎获取网页结果，使用 VLM 进行智能分析...
 
 ## 调用方式
-\```python
+```- python
 from services.websearch_service.client import WebSearchClient
 client = WebSearchClient()
 result = client.search("Python async编程", max_results=5)
-\```
+```-
 
 ## 返回格式
-\```python
 { "query": "...", "results": [...] }
-\```
+```
 
 ##### 3. 沙盒隔离执行 (Sandbox Isolation)
 
@@ -339,11 +338,11 @@ description: Real-time web search service based on SearXNG and VLM
 Fetches web results through SearXNG, uses VLM for intelligent analysis...
 
 ## Usage
-\```python
+```- python
 from services.websearch_service.client import WebSearchClient
 client = WebSearchClient()
 result = client.search("Python async programming", max_results=5)
-\```
+```-
 ```
 
 ##### 3. Sandbox Isolation
