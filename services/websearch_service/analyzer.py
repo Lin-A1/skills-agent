@@ -76,7 +76,7 @@ class IntelligentSearchAnalyzer:
         # === SearXNG 配置 ===
         self.searxng_url = os.getenv("SEARXNG_URL", "http://localhost:8005")
         self.searxng_timeout = float(os.getenv("SEARXNG_TIMEOUT", "10.0"))
-        self.searxng_engines = os.getenv("SEARXNG_ENGINES", "bing,baidu,360search")
+        self.searxng_engines = os.getenv("SEARXNG_ENGINES", "bing,baidu")  # 移除 360search 提高速度
         self.searxng_language = os.getenv("SEARXNG_LANGUAGE", "zh-CN")
         self.enable_baike = os.getenv("ENABLE_BAIKE_SEARCH", "true").lower() == "true"
 
@@ -116,7 +116,7 @@ class IntelligentSearchAnalyzer:
         )
         
         # 并发配置
-        self.max_concurrent_pages = 4
+        self.max_concurrent_pages = 6  # 提升并发处理能力
 
         logger.info(
             f"初始化完成 - LLM模型: {self.llm_model}, "
@@ -343,8 +343,9 @@ class IntelligentSearchAnalyzer:
             # Rerank 过滤 (Strict > 0.9)
             try:
                 # 拼接标题和摘要进行重排序打分
-                text_content = extracted_text.get("main_text", "")[:2000]
-                text_to_rank = f"{title}\n{text_content}"
+                # 限制文本长度避免 Rerank 服务 400 错误
+                text_content = extracted_text.get("main_text", "")[:800]
+                text_to_rank = f"{title[:100]}\n{text_content}"
                 
                 loop = asyncio.get_running_loop()
                 rerank_result = await loop.run_in_executor(
@@ -357,13 +358,13 @@ class IntelligentSearchAnalyzer:
                 
                 if rerank_result and "results" in rerank_result:
                     score = rerank_result["results"][0]["relevance_score"]
-                    if score < 0.90:
-                        logger.info(f"[{index}] Rerank 过滤: 评分 {score:.4f} < 0.90，跳过")
+                    if score < 0.75:  # 降低阈值提高召回率
+                        logger.info(f"[{index}] Rerank 过滤: 评分 {score:.4f} < 0.75，跳过")
                         return SearchResult(
                             index=index, title=title, url=url, source_domain=domain,
                             timestamp=datetime.now().isoformat(),
                             success=False, 
-                            error_message=f"相关性评分不足 ({score:.2f} < 0.90)", 
+                            error_message=f"相关性评分不足 ({score:.2f} < 0.75)", 
                             from_cache=False
                         )
                     logger.info(f"[{index}] Rerank 通过: {score:.4f}")

@@ -1,10 +1,6 @@
 ---
-name: websearch_service
-description: |
-  Use ONLY for retrieving **real-time information**, **specific facts**, **news**, **events**, and **unknown entities** (companies, products, people) that are NOT in your internal knowledge base.
-  **Strictly** for external/dynamic information retrieval.
-client_class: WebSearchClient
-default_method: search
+name: websearch-service
+description: 基于 SearXNG 与 VLM 的实时联网搜索服务。专用于获取最新新闻、实时事件及特定事实。内置智能双层缓存（向量+数据库）与网页内容自动提取分析功能。
 ---
 
 ## 功能
@@ -29,10 +25,12 @@ result2 = client.search("openai", max_results=3, force_refresh=True)
 
 # 获取结果
 for r in result["results"]:
-    print(r["title"], r["data"]["main_content"])
+    if r.get("success") and r.get("data"):
+        print(r["title"], r["data"]["main_content"])
     
 for r in result2["results"]:
-    print(r["title"], r["data"]["main_content"])
+    if r.get("success") and r.get("data"):
+        print(r["title"], r["data"]["main_content"])
 ```
 
 ## 返回格式

@@ -1,8 +1,6 @@
 ---
-name: ocr_service
-description: 光学字符识别服务，从图像中提取文字内容
-client_class: OCRServiceClient
-default_method: ocr
+name: ocr-service
+description: 高精度光学字符识别（OCR）服务。支持多语言、多格式图像的文字检测与提取，并提供文本区域坐标与置信度评分，适用于文档数字化与图像内容分析。
 ---
 
 ## 功能

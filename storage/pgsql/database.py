@@ -20,7 +20,7 @@ def get_database_url():
     port = os.getenv('PGSQL_PORT', '5432')
     database = os.getenv('PGSQL_DATABASE', 'myagent')
     
-    return f"postgresql://{user}:{password}@{host}:{port}/{database}"
+    return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}"
 
 
 def init_db():

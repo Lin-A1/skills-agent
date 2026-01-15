@@ -457,7 +457,7 @@ class DeepSearchEngine:
                 response = await self.http_client.post(
                     f"{self.websearch_url}/search",
                     json={"query": query, "max_results": max_results, "force_refresh": False},
-                    timeout=30.0  # 减少超时，快速失败
+                    timeout=90.0  # 增加超时以适应慢速抓取
                 )
                 response.raise_for_status()
                 data = response.json()

@@ -4,62 +4,81 @@
 
 @layer base {
   :root {
-    /* Sophisticated Theme: Deep Slate & Muted Indigo */
+    /* Theme: Low-key Elegance (Silent Fog) */
+    /* 基于 Zinc/Slate 色系，极度克制，注重质感 */
 
-    /* Backgrounds: Warm stone for comfort, not clinical white */
-    --background: 60 5% 98%;
-    /* Warm Stone / Paper (#FAFAF9) */
-    --foreground: 24 5% 10%;
-    /* Dark Charcoal (#1C1917) */
+    /* Backgrounds */
+    --background: 240 5% 99.5%;
+    /* 极淡的灰白，非刺眼纯白 */
+    --foreground: 240 4% 16%;
+    /* 柔和的深炭灰，非死黑 */
 
     --card: 0 0% 100%;
-    --card-foreground: 24 5% 10%;
+    --card-foreground: 240 4% 16%;
 
-    /* Primary: Deep Slate Blue - confident but quiet */
-    --primary: 215 25% 27%;
-    /* Slate Blue (#334155) */
-    --primary-foreground: 210 40% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 4% 16%;
 
-    --secondary: 40 10% 94%;
-    --secondary-foreground: 24 5% 10%;
+    /* Primary: Elegant Black */
+    --primary: 240 6% 10%;
+    --primary-foreground: 0 0% 98%;
 
-    --muted: 40 10% 94%;
-    --muted-foreground: 25 5% 45%;
+    /* Secondary: Subtle Grey for bubbles/hover */
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
 
-    /* Accent: Antique Bronze - rich highlights */
-    --accent: 30 80% 35%;
-    /* Antique Bronze (#B45309 type) - Rich/Dark Orange-Gold */
-    --accent-foreground: 60 5% 98%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
 
-    --border: 30 10% 90%;
-    --input: 30 10% 90%;
+    /* Accent: Desaturated Slate Blue */
+    --accent: 220 14% 96%;
+    --accent-foreground: 240 6% 10%;
 
-    /* Design Tokens - Standardized Values */
-    --radius: 0.5rem;
-    --radius-sm: 0.375rem;
-    --radius-md: 0.5rem;
-    --radius-lg: 0.75rem;
-    --radius-xl: 0.875rem;
-    --radius-2xl: 1rem;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
 
-    /* Spacing Scale */
-    --spacing-xs: 0.5rem;
-    --spacing-sm: 0.75rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-    --spacing-xl: 2rem;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 240 6% 10%;
 
-    /* Brand Colors for consistency */
-    --brand-slate: #334155;
-    --brand-charcoal: #1C1917;
-    --brand-stone: #78716C;
-    --brand-stone-light: #A8A29E;
-    --brand-stone-lighter: #D6D3D1;
+    /* Design Tokens */
+    --radius: 0.85rem;
+    --radius-sm: 0.5rem;
+    --radius-md: 0.85rem;
+    --radius-lg: 1.1rem;
+    --radius-xl: 1.5rem;
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    /* Obsidian Fog */
+    --background: 240 6% 8%;
+    /* 深邃的黑灰 */
+    --foreground: 240 5% 96%;
+
+    --card: 240 6% 10%;
+    --card-foreground: 240 5% 96%;
+
+    --popover: 240 6% 10%;
+    --popover-foreground: 240 5% 96%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 6% 10%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 240 5% 84%;
   }
 }
 
@@ -70,8 +89,20 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter var', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Clean, Modern Sans-serif stack */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: -0.015em;
+    /* 稍微紧凑的字间距，更显精致 */
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    letter-spacing: -0.025em;
   }
 }
 

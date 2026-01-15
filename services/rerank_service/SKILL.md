@@ -1,8 +1,6 @@
 ---
-name: rerank_service
-description: 文档重排序服务，根据查询对候选文档进行相关性评分和排序
-client_class: RerankServiceClient
-default_method: rerank
+name: rerank-service
+description: 文档重排序服务（Reranker）。基于深度学习模型对检索候选结果进行细粒度相关性打分与重新排序，显著提升检索结果的精准度（Top-K 准确率）。
 ---
 
 ## 功能

@@ -108,12 +108,13 @@ async def periodic_cleanup():
         try:
             await asyncio.sleep(cleanup_interval)
             
-            # 清理已停止的沙盒容器
+            # 清理已停止的沙盒执行容器
             logger.info("开始定期清理...")
             
-            # 清理名称以 sandbox_ 开头的容器
+            # 只清理名称以 sandbox_exec_ 开头的临时执行容器
+            # 注意：不要清理 sandbox_service 本身！
             process = await asyncio.create_subprocess_exec(
-                "docker", "container", "ls", "-aq", "--filter", "name=sandbox_",
+                "docker", "container", "ls", "-aq", "--filter", "name=sandbox_exec_",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL
             )
@@ -122,7 +123,7 @@ async def periodic_cleanup():
             container_ids = [c for c in container_ids if c]
             
             if container_ids:
-                logger.info(f"发现 {len(container_ids)} 个残留沙盒容器，正在清理...")
+                logger.info(f"发现 {len(container_ids)} 个残留沙盒执行容器，正在清理...")
                 for cid in container_ids:
                     try:
                         rm_process = await asyncio.create_subprocess_exec(

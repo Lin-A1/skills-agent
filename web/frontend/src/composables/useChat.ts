@@ -2,11 +2,13 @@ import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { mermaid } from '@/lib/markdown'
 
 export interface AgentStep {
-    type: 'thought' | 'action' | 'observation' | 'error' | 'plan'
-    content: string
-    toolName?: string
-    toolInput?: any
-    planData?: any
+    type: 'thinking' | 'skill_call' | 'skill_result' | 'code_execute' | 'code_result' | 'error' | 'text'
+    content?: string
+    skillName?: string
+    code?: string
+    result?: Record<string, any>
+    error?: string
+    timestamp?: string
 }
 
 export interface ChatMessage {
@@ -24,6 +26,7 @@ export interface SessionInfo {
     created_at: string
     updated_at: string
     message_count: number
+    mode: 'chat' | 'agent'
 }
 
 export interface UploadedImage {
@@ -34,6 +37,19 @@ export interface UploadedImage {
 export const useChat = () => {
     const messages = ref<ChatMessage[]>([])
     const input = ref('')
+
+    // Agent 模式状态
+    const storedAgentMode = localStorage.getItem('is_agent_mode') === 'true'
+    const isAgentMode = ref(storedAgentMode)
+
+    // 监听 Agent 模式变化，同步到 localStorage
+    watch(isAgentMode, (newVal) => {
+        localStorage.setItem('is_agent_mode', String(newVal))
+    })
+
+    // toggleAgentMode will be defined after loadSessions
+    let toggleAgentMode: () => void
+
     const status = ref<'idle' | 'streaming'>('idle')
 
     // 从 localStorage 恢复 sessionId（刷新页面后保持会话）
@@ -64,6 +80,24 @@ export const useChat = () => {
 
     const searchQuery = ref('')
     const showSearch = ref(false)
+
+    // Canvas state
+    const isCanvasOpen = ref(false)
+    const canvasContent = ref('')
+    const canvasLanguage = ref('')
+    const userManuallyClosedCanvas = ref(false)
+
+    const openCanvas = (content: string, language: string) => {
+        canvasContent.value = content
+        canvasLanguage.value = language
+        isCanvasOpen.value = true
+        userManuallyClosedCanvas.value = false
+    }
+
+    const closeCanvas = () => {
+        isCanvasOpen.value = false
+        userManuallyClosedCanvas.value = true
+    }
 
     // Thinking timer state - minimal implementation for UI compatibility
     const thinkingSeconds = ref(0)
@@ -193,19 +227,54 @@ export const useChat = () => {
     // Load session list from backend (supports both Chat and Agent modes)
     const loadSessions = async () => {
         try {
-            let url = '/api/chat/sessions?page_size=20'
-            const response = await fetch(url)
-            if (response.ok) {
-                const data = await response.json()
-                sessions.value = data.sessions || []
+            const [chatRes, agentRes] = await Promise.allSettled([
+                fetch('/api/chat/sessions?page_size=20'),
+                fetch('/api/agent/sessions?page_size=20')
+            ])
+
+            let allSessions: SessionInfo[] = []
+
+            if (chatRes.status === 'fulfilled' && chatRes.value.ok) {
+                const data = await chatRes.value.json()
+                const chats = data.sessions || []
+                allSessions = allSessions.concat(chats.map((s: any) => ({ ...s, mode: 'chat' })))
             }
+
+            if (agentRes.status === 'fulfilled' && agentRes.value.ok) {
+                const data = await agentRes.value.json()
+                const agents = data.sessions || []
+                allSessions = allSessions.concat(agents.map((s: any) => ({ ...s, mode: 'agent' })))
+            }
+
+            // Sort by updated_at desc
+            sessions.value = allSessions.sort((a, b) =>
+                new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+            )
         } catch (err) {
             console.error('Failed to load sessions:', err)
         }
     }
 
+    // Define toggleAgentMode now that loadSessions is available
+    toggleAgentMode = () => {
+        // Toggle user preference for NEW chats
+        if (!sessionId.value) {
+            isAgentMode.value = !isAgentMode.value
+        }
+    }
+
     // Load messages from a session
-    const loadSession = async (id: string) => {
+    const loadSession = async (id: string, modeOverride?: 'chat' | 'agent') => {
+        // Find session mode from list if not provided
+        if (!modeOverride) {
+            const session = sessions.value.find(s => s.id === id)
+            if (session) {
+                isAgentMode.value = (session.mode === 'agent')
+            }
+        } else {
+            isAgentMode.value = (modeOverride === 'agent')
+        }
+
         // Abort any ongoing streaming before switching
         if (abortController.value) {
             abortController.value.abort()
@@ -215,13 +284,14 @@ export const useChat = () => {
         isLoadingSession.value = true
 
         try {
-            let url = `/api/chat/sessions/${id}/messages`
+            const baseUrl = isAgentMode.value ? '/api/agent' : '/api/chat'
+            const url = `${baseUrl}/sessions/${id}/messages`
             const response = await fetch(url)
             if (response.ok) {
                 const data = await response.json()
                 sessionId.value = id
 
-                // Chat API returns messages in data.messages
+                // API returns messages in data.messages
                 const rawMessages = data.messages || []
 
                 messages.value = rawMessages.map((m: any) => ({
@@ -230,6 +300,8 @@ export const useChat = () => {
                     content: m.content,
                     reasoning: m.extra_data?.reasoning,
                     images: m.images,
+                    // Agent messages may have agent step data in extra_data
+                    agentSteps: m.extra_data?.agentSteps,
                     createdAt: m.created_at
                 }))
 
@@ -269,12 +341,14 @@ export const useChat = () => {
         status.value = 'idle'
         messages.value = []
         sessionId.value = null
+        // Note: We do NOT reset isAgentMode here. It reflects the mode for the Next message.
     }
 
     // Delete a session (supports both Chat and Agent modes)
     const deleteSession = async (id: string) => {
         try {
-            let url = `/api/chat/sessions/${id}`
+            const baseUrl = isAgentMode.value ? '/api/agent' : '/api/chat'
+            const url = `${baseUrl}/sessions/${id}`
             const response = await fetch(url, { method: 'DELETE' })
             if (response.ok) {
                 sessions.value = sessions.value.filter(s => s.id !== id)
@@ -325,12 +399,13 @@ export const useChat = () => {
         // 1. Delete this message and all messages after it from backend
         let deleteSuccess = true
         if (sessionId.value && targetMsg.id) {
-            // Chat mode: delete one by one
+            // Chat/Agent mode: delete one by one
+            const baseUrl = isAgentMode.value ? '/api/agent' : '/api/chat'
             for (let i = messages.value.length - 1; i >= msgIndex; i--) {
                 const msg = messages.value[i]
                 if (msg && msg.id) {
                     try {
-                        const response = await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
+                        const response = await fetch(`${baseUrl}/sessions/${sessionId.value}/messages/${msg.id}`, {
                             method: 'DELETE'
                         })
                         if (!response.ok) {
@@ -378,12 +453,13 @@ export const useChat = () => {
 
         // Delete this message and all messages after it from backend
         if (sessionId.value) {
-            // Chat mode: delete one by one (reverse order)
+            // Chat/Agent mode: delete one by one (reverse order)
+            const baseUrl = isAgentMode.value ? '/api/agent' : '/api/chat'
             for (let i = messages.value.length - 1; i >= msgIndex; i--) {
                 const msg = messages.value[i]
                 if (msg && msg.id) {
                     try {
-                        await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
+                        await fetch(`${baseUrl}/sessions/${sessionId.value}/messages/${msg.id}`, {
                             method: 'DELETE'
                         })
                     } catch (err) {
@@ -416,12 +492,13 @@ export const useChat = () => {
 
         // Delete all assistant messages after the last user message from backend
         if (sessionId.value) {
-            // Chat mode: delete one by one
+            // Chat/Agent mode: delete one by one
+            const baseUrl = isAgentMode.value ? '/api/agent' : '/api/chat'
             for (let i = messages.value.length - 1; i > lastUserMsgIndex; i--) {
                 const msg = messages.value[i]
                 if (msg && msg.role === 'assistant' && msg.id) {
                     try {
-                        await fetch(`/api/chat/sessions/${sessionId.value}/messages/${msg.id}`, {
+                        await fetch(`${baseUrl}/sessions/${sessionId.value}/messages/${msg.id}`, {
                             method: 'DELETE'
                         })
                     } catch (err) {
@@ -443,8 +520,38 @@ export const useChat = () => {
 
     // Regenerate from a specific user message
     const regenerateFromMessage = async (userMsg: ChatMessage, skipSaveUserMessage = false) => {
+        // Find the index of this user message
+        const userMsgIndex = messages.value.findIndex(m => m.id === userMsg.id)
+        if (userMsgIndex !== -1) {
+            // Delete all messages after this user message (backend cleanup if needed)
+            // Delete all messages after this user message (backend cleanup if needed)
+            if (sessionId.value) {
+                const baseUrl = isAgentMode.value ? '/api/agent' : '/api/chat'
+                const deletePromises = []
+                for (let i = messages.value.length - 1; i > userMsgIndex; i--) {
+                    const msg = messages.value[i]
+                    if (msg && msg.id) {
+                        // Wait for deletion to avoid context pollution
+                        deletePromises.push(
+                            fetch(`${baseUrl}/sessions/${sessionId.value}/messages/${msg.id}`, {
+                                method: 'DELETE'
+                            }).catch(err => console.error('Failed to delete message during regen:', err))
+                        )
+                    }
+                }
+                if (deletePromises.length > 0) {
+                    await Promise.all(deletePromises)
+                }
+            }
+            // Retain messages only up to the user message
+            messages.value = messages.value.slice(0, userMsgIndex + 1)
+        }
+
         status.value = 'streaming'
         abortController.value = new AbortController()
+
+        // Reset manual close state for new generation interaction
+        userManuallyClosedCanvas.value = false
 
         // 立即创建一个空的 assistant 消息以显示思考动画
         const assistantMsgId = (Date.now() + 1).toString()
@@ -452,7 +559,8 @@ export const useChat = () => {
             id: assistantMsgId,
             role: 'assistant',
             content: '',
-            reasoning: ''
+            reasoning: '',
+            agentSteps: isAgentMode.value ? [] : undefined
         })
 
         await nextTick()
@@ -475,7 +583,10 @@ export const useChat = () => {
                 clearImages() // 发送后清空图片
             }
 
-            const response = await fetch('/api/chat/completions', {
+            // 根据模式选择不同的API端点
+            const apiEndpoint = isAgentMode.value ? '/api/agent/completions' : '/api/chat/completions'
+
+            const response = await fetch(apiEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody),
@@ -527,6 +638,87 @@ export const useChat = () => {
                             loadSessions()
                         }
 
+                        // 处理 Agent 事件
+                        if (isAgentMode.value && chunk.event_type) {
+                            const lastMsg = messages.value[messages.value.length - 1]
+                            if (lastMsg && lastMsg.id === assistantMsgId) {
+                                if (!lastMsg.agentSteps) {
+                                    lastMsg.agentSteps = []
+                                }
+
+                                const eventType = chunk.event_type as string
+
+                                if (eventType === 'thinking') {
+                                    // 添加或更新思考步骤
+                                    const existingThinking = lastMsg.agentSteps.find(
+                                        s => s.type === 'thinking' && !s.content
+                                    )
+                                    if (existingThinking) {
+                                        existingThinking.content = chunk.content
+                                    } else {
+                                        lastMsg.agentSteps.push({
+                                            type: 'thinking',
+                                            content: chunk.content,
+                                            timestamp: chunk.timestamp
+                                        })
+                                    }
+                                } else if (eventType === 'skill_call') {
+                                    lastMsg.agentSteps.push({
+                                        type: 'skill_call',
+                                        content: chunk.content,
+                                        skillName: chunk.skill_name,
+                                        code: chunk.code,
+                                        timestamp: chunk.timestamp
+                                    })
+                                } else if (eventType === 'code_execute') {
+                                    lastMsg.agentSteps.push({
+                                        type: 'code_execute',
+                                        skillName: chunk.skill_name,
+                                        code: chunk.code,
+                                        timestamp: chunk.timestamp
+                                    })
+                                } else if (eventType === 'skill_result' || eventType === 'code_result') {
+                                    lastMsg.agentSteps.push({
+                                        type: eventType === 'skill_result' ? 'skill_result' : 'code_result',
+                                        skillName: chunk.skill_name,
+                                        result: chunk.result,
+                                        timestamp: chunk.timestamp
+                                    })
+                                } else if (eventType === 'answer') {
+                                    // Agent 的 answer 事件
+                                    if (chunk.content) {
+                                        assistantMsg += chunk.content
+                                        lastMsg.content = assistantMsg
+
+                                        // 将 answer 内容也作为步骤添加到 agentSteps
+                                        const lastStep = lastMsg.agentSteps[lastMsg.agentSteps.length - 1]
+                                        if (lastStep && lastStep.type === 'text') {
+                                            lastStep.content = (lastStep.content || '') + chunk.content
+                                        } else {
+                                            lastMsg.agentSteps.push({
+                                                type: 'text',
+                                                content: chunk.content,
+                                                timestamp: chunk.timestamp
+                                            })
+                                        }
+                                    }
+                                } else if (eventType === 'error') {
+                                    lastMsg.agentSteps.push({
+                                        type: 'error',
+                                        error: chunk.error,
+                                        timestamp: chunk.timestamp
+                                    })
+                                }
+
+                                // 自动滚动
+                                if (shouldAutoScroll.value) {
+                                    scrollToBottom()
+                                }
+                            }
+                            continue
+                        }
+
+                        // 处理 Chat 模式的响应
                         const delta = chunk.choices?.[0]?.delta
                         const content = delta?.content
                         const reasoning = delta?.reasoning_content
@@ -550,6 +742,36 @@ export const useChat = () => {
                                 if (content) {
                                     assistantMsg += content
                                     lastMsg.content = assistantMsg
+
+                                    // Detect code block for canvas
+                                    // Look for the last opened code block
+                                    const codeBlockRegex = /```(\w*)\n([\s\S]*?)(?:```|$)/g
+                                    let match
+                                    let lastMatch
+                                    while ((match = codeBlockRegex.exec(assistantMsg)) !== null) {
+                                        lastMatch = match
+                                    }
+
+                                    if (lastMatch) {
+                                        const lang = lastMatch[1] || ''
+                                        const code = lastMatch[2] || ''
+
+                                        // Auto-open if specific languages or just always for code?
+                                        // Let's auto-open if it's a new code block or we are streaming one
+                                        // A simple heuristic: if we are in a code block that is growing.
+
+                                        // Only update if content changed or it's new
+                                        if (code !== canvasContent.value) {
+                                            canvasContent.value = code
+                                            canvasLanguage.value = lang
+
+                                            // Auto-expand logic:
+                                            // If not open, open it. But respect manual close.
+                                            if (!isCanvasOpen.value && !userManuallyClosedCanvas.value) {
+                                                isCanvasOpen.value = true
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             // Only auto scroll if user was already at bottom
@@ -679,33 +901,49 @@ export const useChat = () => {
         }
 
         nextTick(() => {
-            // Delegate click listener for code copy buttons
-            document.addEventListener('click', async (e) => {
-                const target = (e.target as HTMLElement).closest('.copy-code-btn') as HTMLElement
-                if (target && target.dataset.code) {
-                    try {
-                        const code = decodeURIComponent(target.dataset.code)
-                        await navigator.clipboard.writeText(code)
-
-                        // Visual feedback
-                        const originalHTML = target.innerHTML
-                        target.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><polyline points="20 6 9 17 4 12"/></svg><span class="text-green-600">已复制</span>`
-                        setTimeout(() => {
-                            target.innerHTML = originalHTML
-                        }, 2000)
-                    } catch (err) {
-                        console.error('Failed to copy code:', err)
-                    }
-                }
-            })
+            // Delegate click listener for code interactions
+            document.addEventListener('click', handleGlobalClick)
 
             // Keyboard shortcuts
             window.addEventListener('keydown', handleKeyboardShortcuts)
         })
     })
 
+    // Global click handler for copy/canvas buttons
+    const handleGlobalClick = async (e: Event) => {
+        const target = e.target as HTMLElement
+
+        // Handle Copy Code
+        const copyBtn = target.closest('.copy-code-btn') as HTMLElement
+        if (copyBtn && copyBtn.dataset.code) {
+            try {
+                const code = decodeURIComponent(copyBtn.dataset.code)
+                await navigator.clipboard.writeText(code)
+
+                const originalHTML = copyBtn.innerHTML
+                copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><polyline points="20 6 9 17 4 12"/></svg><span class="text-green-600">已复制</span>`
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalHTML
+                }, 2000)
+            } catch (err) {
+                console.error('Failed to copy code:', err)
+            }
+            return
+        }
+
+        // Handle Open Canvas
+        const canvasBtn = target.closest('.open-canvas-btn') as HTMLElement
+        if (canvasBtn && canvasBtn.dataset.code) {
+            const code = decodeURIComponent(canvasBtn.dataset.code)
+            const language = canvasBtn.dataset.language || ''
+            openCanvas(code, language)
+        }
+    }
+
     // Cleanup scroll listener and keyboard shortcuts
     onUnmounted(() => {
+        document.removeEventListener('click', handleGlobalClick)
+
         if (scrollContainerRef.value) {
             const container = (scrollContainerRef.value as any).$el || scrollContainerRef.value
             const viewport = container.querySelector('[data-radix-scroll-area-viewport]')
@@ -782,6 +1020,15 @@ export const useChat = () => {
         removeImage,
         clearImages,
         // Thinking timer (now exposed if needed by template)
-        thinkingSeconds
+        thinkingSeconds,
+        // Canvas
+        isCanvasOpen,
+        canvasContent,
+        canvasLanguage,
+        openCanvas,
+        closeCanvas,
+        // Agent 模式
+        isAgentMode,
+        toggleAgentMode
     }
 }

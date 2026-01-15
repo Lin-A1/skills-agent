@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # 使用示例
     client = WebSearchClient()
     
-    # 健康检查q
+    # 健康检查
     print(client.health_check())
 
     t1 = time.time()

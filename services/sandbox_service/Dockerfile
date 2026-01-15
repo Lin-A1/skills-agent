@@ -17,7 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     uvicorn \
     python-dotenv \
     httpx \
-    pydantic
+    pydantic \
+    requests
 
 # 安装 Docker CLI (静态二进制)
 ARG DOCKER_VERSION=24.0.7

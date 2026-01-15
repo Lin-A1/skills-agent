@@ -1,8 +1,6 @@
 ---
-name: embedding_service
-description: 文本向量化服务，将文本转换为高维向量，用于语义相似度计算、聚类分析等
-client_class: EmbeddingServiceClient
-default_method: embed_query
+name: embedding-service
+description: 文本向量化（Embedding）基础服务。将自然语言转换为高维稠密向量，为语义搜索、聚类分析、推荐系统等下游任务提供核心数据支持。
 ---
 
 ## 功能

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { X, Copy, Check } from 'lucide-vue-next'
 import { renderMarkdown } from '@/lib/markdown'
 
@@ -14,6 +14,8 @@ const emit = defineEmits<{
 }>()
 
 const copied = ref(false)
+const scrollContainer = ref<HTMLDivElement | null>(null)
+const shouldAutoScroll = ref(true)
 
 const copyContent = async () => {
     try {
@@ -23,6 +25,24 @@ const copyContent = async () => {
     } catch (err) {
         console.error('Failed to copy', err)
     }
+}
+
+// Watch content change to auto-scroll
+watch(() => props.content, async () => {
+    if (shouldAutoScroll.value && props.isOpen) {
+        await nextTick()
+        if (scrollContainer.value) {
+            scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight
+        }
+    }
+})
+
+// Handle manual scroll to disable/enable auto-scroll
+const handleScroll = (e: Event) => {
+    const el = e.target as HTMLElement
+    const threshold = 50
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= threshold
+    shouldAutoScroll.value = isAtBottom
 }
 </script>
 
@@ -49,7 +69,7 @@ const copyContent = async () => {
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto p-6 scrollbar-thin">
+    <div ref="scrollContainer" @scroll="handleScroll" class="flex-1 overflow-y-auto p-6 scrollbar-thin">
         <div v-if="content" class="prose prose-slate dark:prose-invert max-w-none">
              <!-- Wrap in code block if we have language and it looks like code, 
                   but rely on renderMarkdown to handle it if it's already markdown.

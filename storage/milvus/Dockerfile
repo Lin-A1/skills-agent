@@ -19,6 +19,7 @@ RUN echo 'import os, time, sys; from milvus_lite.server import Server; s = Serve
 
 # 创建 Entrypoint 脚本：启动 Python Server 并用 socat 转发端口
 RUN echo '#!/bin/bash\n\
+    rm -f /tmp/milvus_port\n\
     python3 /app/run_milvus.py &\n\
     echo "Waiting for Milvus to start..."\n\
     timeout=30\n\

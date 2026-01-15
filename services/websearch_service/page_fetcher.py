@@ -114,8 +114,8 @@ class PageFetcher:
         page_timeout: int = 20000,  # 增加超时时间以适应模拟操作
         max_screenshot_height: int = 2500,
         device_scale_factor: int = 1,
-        min_page_delay: float = 1.0,  # 增加最小延迟
-        max_page_delay: float = 3.0
+        min_page_delay: float = 0.3,  # 减少延迟加快处理
+        max_page_delay: float = 0.8
     ):
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
@@ -221,32 +221,26 @@ class PageFetcher:
             return None, None, None
     
     async def _simulate_human_behavior(self, page: Page):
-        """模拟人类操作行为：随机鼠标移动和滚动"""
+        """模拟人类操作行为：快速版（减少等待时间）"""
         try:
-            # 1. 随机鼠标移动
-            for _ in range(random.randint(2, 5)):
-                x = random.randint(100, self.viewport_width - 100)
-                y = random.randint(100, self.viewport_height - 100)
-                await page.mouse.move(x, y, steps=5)
-                await asyncio.sleep(random.uniform(0.1, 0.3))
+            # 1. 简化鼠标移动（1-2 次）
+            for _ in range(random.randint(1, 2)):
+                x = random.randint(200, self.viewport_width - 200)
+                y = random.randint(150, self.viewport_height - 150)
+                await page.mouse.move(x, y, steps=3)  # 减少步数
+                await asyncio.sleep(random.uniform(0.05, 0.15))  # 减少延迟
             
-            # 2. 随机滚动
-            # 滚动到底部再回滚一点
+            # 2. 快速滚动到页面中部再回顶部
             total_height = await page.evaluate("document.body.scrollHeight")
-            current_y = 0
-            while current_y < min(total_height, 2000): # 限制滚动深度
-                delta_y = random.randint(300, 700)
-                current_y += delta_y
-                await page.mouse.wheel(0, delta_y)
-                await asyncio.sleep(random.uniform(0.2, 0.5))
-                
-                # 偶尔停顿
-                if random.random() < 0.3:
-                    await asyncio.sleep(random.uniform(0.5, 1.0))
+            scroll_target = min(total_height // 2, 1000)  # 最多滚动 1000px
+            
+            # 一次性滚动
+            await page.mouse.wheel(0, scroll_target)
+            await asyncio.sleep(random.uniform(0.2, 0.4))
             
             # 滚回顶部以便截图
             await page.evaluate("window.scrollTo(0, 0)")
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.2)
             
         except Exception as e:
             logger.warning(f"模拟人类行为失败: {e}")

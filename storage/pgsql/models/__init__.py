@@ -5,6 +5,7 @@ PostgreSQL ORM 模型
 from .base import Base, BaseModel
 from .search import SearchResult
 from .chat import ChatSession, ChatMessage
+from .agent import AgentSession, AgentMessage, AgentMemory
 
 
 __all__ = [
@@ -13,5 +14,7 @@ __all__ = [
     'SearchResult',
     'ChatSession',
     'ChatMessage',
-
+    'AgentSession',
+    'AgentMessage',
+    'AgentMemory',
 ]

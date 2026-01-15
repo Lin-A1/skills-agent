@@ -3,10 +3,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { 
-  Brain, ChevronDown, Copy, BookOpen, RefreshCcw, 
+  Brain, ChevronDown, Copy, RefreshCcw, ArrowDown,
   CornerUpLeft, Pencil, Check, SendIcon, Plus, ImageIcon, PenLine, Wand2, X
 } from 'lucide-vue-next'
 import { renderMarkdown } from '@/lib/markdown'
+import AgentStepTimeline from './AgentStepTimeline.vue'
 
 import type { ChatMessage, UploadedImage } from '@/composables/useChat'
 
@@ -21,6 +22,7 @@ const props = defineProps<{
   copiedMessageId: string | null
   maxImages: number
   input: string
+  isAgentMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -37,6 +39,7 @@ const emit = defineEmits<{
   (e: 'rollbackToMessage', id: string): void
   (e: 'copyMessage', msg: ChatMessage): void
   (e: 'regenerateFromMessage', msg: ChatMessage): void
+  (e: 'update:isAgentMode', value: boolean): void
 }>()
 
 const scrollContainerRef = ref<InstanceType<typeof ScrollArea> | null>(null)
@@ -49,37 +52,41 @@ const triggerImageUpload = () => fileInputRef.value?.click()
 // Helpers for visual timeline
 
 
-// Code block copy handler
-const handleCopyCode = async (e: MouseEvent) => {
-  const target = (e.target as HTMLElement).closest('.copy-code-btn')
-  if (!target) return
-  
-  const btn = target as HTMLButtonElement
-  const code = decodeURIComponent(btn.getAttribute('data-code') || '')
-  if (code) {
-    try {
-      await navigator.clipboard.writeText(code)
-      
-      // Visual feedback
-      const originalHTML = btn.innerHTML
-      btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-500"><polyline points="20 6 9 17 4 12"/></svg> Copied!`
-      
-      setTimeout(() => {
-        btn.innerHTML = originalHTML
-      }, 2000)
-    } catch (err) {
-      console.error('Failed to copy', err)
-    }
-  }
-}
 
 onMounted(() => {
-  document.addEventListener('click', handleCopyCode)
+  // Attach scroll listener to Radix viewport
+  const el = (scrollContainerRef.value as any)?.$el || scrollContainerRef.value
+  const viewport = el?.querySelector('[data-radix-scroll-area-viewport]')
+  if (viewport) {
+    viewport.addEventListener('scroll', handleScroll)
+  }
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleCopyCode)
+  const el = (scrollContainerRef.value as any)?.$el || scrollContainerRef.value
+  const viewport = el?.querySelector('[data-radix-scroll-area-viewport]')
+  if (viewport) {
+    viewport.removeEventListener('scroll', handleScroll)
+  }
 })
+
+const showScrollButton = ref(false)
+
+const handleScroll = (e: Event) => {
+  const target = e.target as HTMLElement
+  const { scrollTop, scrollHeight, clientHeight } = target
+  showScrollButton.value = scrollHeight - scrollTop - clientHeight > 200
+  // Emit scroll event if needed by parent, but usually not required for this local button
+}
+
+const scrollToBottom = () => {
+    if (scrollContainerRef.value) {
+        const viewport = scrollContainerRef.value.$el.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement
+        if (viewport) {
+             viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' })
+        }
+    }
+}
 
 defineExpose({
   scrollContainerRef,
@@ -95,7 +102,13 @@ defineExpose({
       <div v-if="messages.length === 0" class="flex flex-col items-center justify-center min-h-[70vh] relative z-20 animate-in fade-in zoom-in-95 duration-500">
          
          <!-- Title -->
-         <h2 class="text-3xl font-medium text-foreground mb-12 tracking-tight">How can I help you?</h2>
+         <!-- Title with Glow Effect -->
+         <div class="relative z-10 text-center mb-12">
+            <div class="absolute -inset-10 bg-gradient-to-r from-violet-500/20 via-sky-500/20 to-emerald-500/20 blur-3xl opacity-30 dark:opacity-20 rounded-full pointer-events-none"></div>
+            <h2 class="text-4xl font-semibold bg-clip-text text-transparent bg-gradient-to-br from-foreground to-foreground/70 tracking-tight relative">
+              How can I help you?
+            </h2>
+         </div>
 
 
 
@@ -123,6 +136,7 @@ defineExpose({
 
                      <!-- Input -->
                      <textarea
+                        autofocus
                         :value="input"
                         @input="emit('update:input', ($event.target as HTMLTextAreaElement).value)"
                         @keydown.enter.exact.prevent="emit('submit')"
@@ -134,9 +148,29 @@ defineExpose({
                      ></textarea>
 
                      <!-- Right Actions -->
-                     <div class="flex items-center gap-1 pr-1">
-                         <Button type="submit" :disabled="!input.trim() && uploadedImages.length === 0" size="icon" :class="['w-10 h-10 rounded-full transition-all duration-200', (!input.trim() && uploadedImages.length === 0) ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md']">
-                             <SendIcon class="w-5 h-5" />
+                     <div class="flex items-center gap-3 pr-2">
+                         <!-- Agent Mode Toggle -->
+                         <div 
+                           class="flex items-center gap-1.5 cursor-pointer group/toggle p-1.5 rounded-lg hover:bg-muted/50 transition-all select-none"
+                           @click="$emit('update:isAgentMode', !isAgentMode)"
+                           title="Enable Agent Capabilities (Deep Research, Coding, etc.)"
+                         >
+                            <div :class="[
+                                'w-8 h-4 rounded-full relative transition-colors duration-300 ease-in-out',
+                                isAgentMode ? 'bg-primary' : 'bg-muted-foreground/20'
+                            ]">
+                                <div :class="[
+                                    'absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 shadow-sm',
+                                    isAgentMode ? 'translate-x-4' : 'translate-x-0'
+                                ]"></div>
+                            </div>
+                            <span :class="['text-xs font-semibold tracking-wide transition-colors', isAgentMode ? 'text-primary' : 'text-muted-foreground/70 group-hover/toggle:text-foreground']">Agent Mode</span>
+                         </div>
+
+                         <div class="h-6 w-[1px] bg-border mx-1"></div>
+
+                         <Button type="submit" :disabled="!input.trim() && uploadedImages.length === 0" size="icon" :class="['w-9 h-9 rounded-full transition-all duration-200', (!input.trim() && uploadedImages.length === 0) ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md']">
+                             <SendIcon class="w-4 h-4" />
                          </Button>
                      </div>
                  </form>
@@ -183,35 +217,33 @@ defineExpose({
             <!-- Normal mode -->
             <div v-else class="flex justify-end group">
               <div class="flex flex-col items-end gap-1 max-w-[85%]">
-                <div class="bg-primary text-primary-foreground px-5 py-3.5 rounded-2xl rounded-br-sm text-[15px] leading-relaxed shadow-lg shadow-primary/10 transition-all hover:shadow-primary/20 hover:-translate-y-0.5 tracking-wide font-light whitespace-pre-wrap">
+                <div class="bg-secondary text-secondary-foreground px-6 py-4 rounded-[1.5rem] rounded-tr-md text-[16px] leading-7 font-normal md:max-w-2xl shadow-none">
                   <!-- Render Images if present -->
-                  <div v-if="msg.images && msg.images.length > 0" class="flex flex-wrap gap-2 mb-2">
+                  <div v-if="msg.images && msg.images.length > 0" class="grid grid-cols-2 gap-2 mb-3">
                     <img 
                       v-for="(img, imgIndex) in msg.images" 
                       :key="imgIndex"
                       :src="img" 
-                      class="max-w-full h-auto max-h-[300px] rounded-lg border border-white/10"
+                      class="w-full h-auto rounded-xl border border-black/5 dark:border-white/5 object-cover"
                     />
                   </div>
                   {{ msg.content }}
                 </div>
                 <!-- Edit button -->
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 pr-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <button 
                     @click="emit('startEdit', msg)"
-                    class="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                    class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-all"
                     title="Edit Message"
                   >
-                    <Pencil class="w-3 h-3" />
-                    <span>Edit</span>
+                    <Pencil class="w-3.5 h-3.5" />
                   </button>
                   <button 
                     @click="emit('rollbackToMessage', msg.id)"
-                    class="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                    class="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
                     title="Rollback and delete"
                   >
-                    <CornerUpLeft class="w-3 h-3" />
-                    <span>Rollback</span>
+                    <CornerUpLeft class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -219,55 +251,51 @@ defineExpose({
           </div>
 
            <!-- Assistant Message -->
-          <div v-else class="flex gap-5 animate-in fade-in duration-700 slide-in-from-bottom-2 group" style="animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);">
-            <div class="flex-shrink-0 mt-1">
-              <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/10">
-                <BookOpen class="w-4.5 h-4.5 text-primary-foreground" />
-              </div>
-            </div>
-            <div class="flex-1 min-w-0 space-y-2.5">
-                <div class="text-[13px] font-bold text-primary ml-1 tracking-wide uppercase opacity-70">Sage</div>
+          <div v-else class="flex gap-4 animate-in fade-in duration-700 slide-in-from-bottom-2 group pl-0 md:pl-0" style="animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);">
+            <div class="flex-1 min-w-0 space-y-2">
                 
-
+                <!-- Agent Steps Timeline (Handles both steps and text in Agent Mode) -->
+                <AgentStepTimeline 
+                  v-if="msg.agentSteps && msg.agentSteps.length > 0"
+                  :steps="msg.agentSteps"
+                  :is-streaming="index === messages.length - 1 && status === 'streaming'"
+                />
 
                 <!-- Reasoning Block for Non-Agent Models -->
                 <div v-if="msg.reasoning" class="mb-4">
-                  <details class="group bg-background/50 rounded-xl border border-border open:bg-background open:shadow-sm transition-all" :open="index === messages.length - 1 && status === 'streaming'">
+                  <details class="group bg-zinc-50/50 dark:bg-zinc-900/50 rounded-xl border border-black/5 dark:border-white/5 open:bg-transparent transition-all" :open="index === messages.length - 1 && status === 'streaming'">
                       <summary class="flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground select-none list-none rounded-xl">
-                          <Brain class="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Deep Thinking</span>
+                          <Brain class="w-3.5 h-3.5 text-zinc-500" />
+                          <span>Thinking Process</span>
                           <ChevronDown class="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-180 text-muted-foreground ml-auto" />
                       </summary>
-                      <div class="px-3 pb-3 pt-1 border-t border-border mx-1 mt-1">
-                          <div class="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed italic border-l-2 border-indigo-100 pl-3">
+                      <div class="px-4 pb-4 pt-1">
+                          <div class="text-[13px] text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap leading-relaxed border-l-[1.5px] border-zinc-200 dark:border-zinc-800 pl-4 py-1">
                               {{ msg.reasoning }}
                           </div>
                       </div>
                   </details>
                 </div>
 
-                <div class="prose prose-slate max-w-none text-foreground leading-8 font-normal tracking-normal glass p-5 rounded-2xl rounded-tl-sm shadow-sm border-0">
-
+                <!-- Standard Content Renderer (Only if NO agent steps) -->
+                <div v-if="(!msg.agentSteps || msg.agentSteps.length === 0)" class="prose prose-zinc dark:prose-invert max-w-none text-foreground leading-7 font-normal tracking-wide px-1">
                     <div v-if="msg.content" v-html="renderMarkdown(msg.content)"></div>
-                    <div v-else-if="status !== 'streaming'" class="text-muted-foreground italic">
-                        (No response generated)
+                    <div v-else-if="status !== 'streaming'" class="text-muted-foreground italic text-sm">
+                        
                     </div>
-
-                     <div v-if="!msg.content && (index === messages.length - 1 && status === 'streaming')" class="py-1 flex items-center gap-3">
-                       <div class="relative flex items-center justify-center w-5 h-5">
-                         <div class="absolute inset-0 bg-indigo-500/20 rounded-full animate-ping"></div>
-                         <div class="relative w-2.5 h-2.5 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-full animate-spin"></div>
-                       </div>
-                       <span class="text-sm font-medium text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-violet-500 animate-pulse">Thinking <span v-if="thinkingSeconds > 0">({{ thinkingSeconds }}s)</span>...</span>
+                     <div v-if="!msg.content && (index === messages.length - 1 && status === 'streaming')" class="py-2 flex items-center gap-3">
+                       <span class="relative flex h-2.5 w-2.5">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-zinc-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-zinc-500"></span>
+                        </span>
                      </div>
-
                 </div>
                 
                 <!-- Message Actions -->
-                <div v-if="msg.content" class="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity pl-1">
+                <div v-if="msg.content" class="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity px-1">
                   <button 
                     @click="emit('copyMessage', msg)" 
-                    class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                    class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-colors"
                     title="Copy"
                   >
                      <Check v-if="copiedMessageId === msg.id" class="w-3.5 h-3.5 text-green-600" />
@@ -276,7 +304,7 @@ defineExpose({
                   <button 
                     @click="emit('regenerateFromMessage', messages[index - 1]!)"
                     v-if="index > 0 && messages[index - 1]?.role === 'user'"
-                    class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                    class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-colors"
                     title="Regenerate"
                   >
                      <RefreshCcw class="w-3.5 h-3.5" />
@@ -288,5 +316,29 @@ defineExpose({
         <div ref="bottomRef" class="h-4"></div>
       </div>
     </div>
+
+    <!-- Scroll to Bottom Button -->
+    <Transition name="fade">
+      <button 
+        v-if="showScrollButton"
+        @click="scrollToBottom"
+        class="fixed bottom-24 right-8 z-40 p-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:bg-primary/90 transition-all duration-300 hover:-translate-y-1"
+        aria-label="Scroll to bottom"
+      >
+        <ArrowDown class="w-5 h-5" />
+      </button>
+    </Transition>
   </ScrollArea>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+</style>

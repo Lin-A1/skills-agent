@@ -166,6 +166,7 @@ services:
       # 信任模式下容器挂载路径（宿主机绝对路径）
       - SERVICES_MOUNT_PATH=${PWD}/services
       - ENV_FILE_PATH=${PWD}/.env
+      - SANDBOX_TRUSTED_IMAGE=myagent_sandbox_service
     volumes:
       - ./services/sandbox_service:/app
       - ./services:/app/services # 挂载 services 供信任模式使用
@@ -265,7 +266,37 @@ services:
       retries: 3
       start_period: 30s
 
-
+  agent:
+    build:
+      context: .
+      dockerfile: app/agent/Dockerfile
+    container_name: agent_app
+    ports:
+      - "${AGENT_SERVICE_PORT:-8009}:${AGENT_SERVICE_PORT:-8009}"
+    env_file:
+      - .env
+    environment:
+      - PGSQL_HOST=pgsql # 使用容器名连接数据库
+      - PGSQL_PORT=5432 # 容器内部通信端口（固定）
+      - SANDBOX_SERVICE_HOST=sandbox_service # Sandbox 服务
+      - SANDBOX_SERVICE_PORT=8010
+      - SKILLS_DIRECTORY=/app/services # Skills 目录
+    volumes:
+      - ./app/agent:/app/app/agent
+      - ./services:/app/services # 挂载 services 供 skill 发现
+      - ./storage:/app/storage
+    restart: unless-stopped
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      sandbox_service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${AGENT_SERVICE_PORT:-8009}/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 networks:
   default:

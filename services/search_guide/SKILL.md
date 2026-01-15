@@ -1,21 +1,6 @@
 ---
-name: search_guidelines
-description: |
-  搜索工具使用规范。指导何时应该搜索、何时不应该搜索。
-  适用于：决策是否需要调用搜索工具。
-  **这是一个参考文档，不是可执行工具。**
-executable: false
-related_tools:
-  - websearch_service
-  - deepsearch_service
----
-
-### When NOT to Search 🚫
-- **General Knowledge**: History, geography, basic science, common facts.
-- **Coding & Algorithms**: Writing standard algorithms (sorting, DFS/BFS), boilerplate code, or using standard libraries (Python stdlib, React hooks). **TRUST YOUR TRAINING.**
-- **Creative Writing**: Poems, stories, essays, brainstorming.
-- **Logical Reasoning**: Math problems, riddles, analysis of provided text.
-- **Internal Context**: Information already provided in the prompt or conversation history.vice
+name: search-guide
+description: 搜索工具调用决策指南。明确定义 Agent 何时应调用搜索工具（如实时信息、具体事实），何时应依赖内部知识。作为参考规范，优化 Agent 的工具使用策略。
 ---
 
 ## 搜索工具使用规范

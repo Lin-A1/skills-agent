@@ -101,7 +101,7 @@ class CodeExecutor:
         
         config = LANGUAGE_CONFIG[lang]
         exec_timeout = timeout or self.timeout
-        container_name = f"sandbox_{uuid.uuid4().hex[:12]}"
+        container_name = f"sandbox_exec_{uuid.uuid4().hex[:12]}"
 
         
         # 预处理代码：去除公共前导空白和首尾空行

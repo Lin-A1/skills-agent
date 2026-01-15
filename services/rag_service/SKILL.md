@@ -1,8 +1,6 @@
 ---
-name: rag_service
-description: RAG多路检索服务，提供基于向量数据库的语义检索、Rerank重排序，支持历史内容召回
-client_class: RAGServiceClient
-default_method: retrieve
+name: rag-service
+description: 高性能 RAG 多路检索服务。集成 Milvus 向量数据库进行语义检索，并结合 Rerank 模型进行精准重排序，支持海量文档的高效存储与历史内容召回。
 ---
 
 ## 功能

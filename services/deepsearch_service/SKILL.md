@@ -1,8 +1,6 @@
 ---
-name: deepsearch_service
-description: 深度搜索服务，基于LLM的迭代式搜索-推理服务，能分解复杂问题并生成综合报告
-client_class: DeepSearchClient
-default_method: search
+name: deepsearch-service
+description: 基于 LLM 的深度迭代搜索与推理服务。擅长处理复杂问题，通过自动分解查询、多轮迭代检索、信息评估与验证，最终生成全面且结构化的深度分析报告。
 ---
 
 ## 功能

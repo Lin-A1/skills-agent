@@ -12,6 +12,7 @@ const props = defineProps<{
   status: string
   isSidebarCollapsed: boolean
   maxImages: number
+  isCanvasOpen?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -45,9 +46,10 @@ const triggerFileSelect = () => {
 
 <template>
   <div :class="[
-      'p-6 fixed bottom-0 right-0 z-20 pointer-events-none transition-all duration-300 ease-in-out',
+      'p-6 fixed bottom-0 z-20 pointer-events-none transition-all duration-300 ease-in-out',
       'bg-gradient-to-t from-background via-background/90 to-transparent',
-      isSidebarCollapsed ? 'left-0' : 'left-0 md:left-[280px]'
+      isSidebarCollapsed ? 'left-0' : 'left-0 md:left-[280px]',
+      isCanvasOpen ? 'md:right-[45vw] right-0' : 'right-0'
   ]">
     <div class="max-w-3xl mx-auto pointer-events-auto">
       <!-- Stop Generation Button -->
@@ -86,7 +88,7 @@ const triggerFileSelect = () => {
            class="hidden"
          />
          
-         <form @submit.prevent="emit('submit')" class="relative glass-input rounded-2xl shadow-soft-lg flex items-end p-2.5 transition-all">
+         <form @submit.prevent="emit('submit')" class="relative bg-background rounded-[2rem] shadow-lg shadow-black/5 dark:shadow-black/20 flex items-end p-2 transition-all border border-black/5 dark:border-white/5 ring-4 ring-black/[0.02] dark:ring-white/[0.02]">
             <!-- Upload Button (Non-Agent Mode) -->
             <Button 
               type="button"
@@ -95,8 +97,8 @@ const triggerFileSelect = () => {
               @click="triggerFileSelect"
               :disabled="uploadedImages.length >= maxImages"
               :class="[
-                'h-10 w-10 mb-1.5 ml-1.5 rounded-xl transition-all flex-shrink-0',
-                uploadedImages.length >= maxImages ? 'text-muted-foreground cursor-not-allowed' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                'h-10 w-10 mb-1 rounded-full transition-all flex-shrink-0',
+                uploadedImages.length >= maxImages ? 'text-muted-foreground cursor-not-allowed' : 'text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5'
               ]"
               title="Upload Image (Max 3)"
             >
@@ -108,8 +110,8 @@ const triggerFileSelect = () => {
               @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
               ref="textareaRef"
               @keydown.enter.exact.prevent="status !== 'streaming' && emit('submit')"
-              :placeholder="uploadedImages.length > 0 ? 'Describe image...' : 'Ask anything...'" 
-              class="flex-1 border-0 focus:ring-0 shadow-none bg-transparent py-3 px-4 min-h-[56px] max-h-[200px] text-base placeholder:text-muted-foreground resize-none overflow-y-auto scrollbar-thin text-foreground outline-none font-medium leading-relaxed"
+              :placeholder="uploadedImages.length > 0 ? 'Describe image...' : 'Message Sage...'" 
+              class="flex-1 border-0 focus:ring-0 shadow-none bg-transparent py-3.5 px-4 min-h-[56px] max-h-[200px] text-[15px] placeholder:text-muted-foreground/50 resize-none overflow-y-auto scrollbar-thin text-foreground outline-none font-normal leading-relaxed"
               :disabled="false"
               autocomplete="off"
               rows="1"
@@ -120,15 +122,17 @@ const triggerFileSelect = () => {
               :disabled="status === 'streaming' || (!modelValue.trim() && uploadedImages.length === 0)"
               size="icon"
               :class="[
-                'h-10 w-10 mb-1.5 mr-1.5 rounded-xl transition-all flex-shrink-0 shadow-md duration-200',
-                (!modelValue.trim() && uploadedImages.length === 0) ? 'bg-muted text-muted-foreground cursor-not-allowed shadow-none' : 'bg-primary hover:bg-primary/90 text-primary-foreground hover:shadow-lg hover:shadow-primary/20 transform active:scale-95'
+                'h-10 w-10 mb-1 mr-1 rounded-full transition-all flex-shrink-0 duration-200 transform',
+                (!modelValue.trim() && uploadedImages.length === 0) 
+                  ? 'bg-transparent text-muted-foreground scale-90 opacity-50 cursor-not-allowed' 
+                  : 'bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:scale-110 active:scale-95'
               ]"
             >
-              <SendIcon class="w-5 h-5" />
+              <SendIcon class="w-4 h-4" />
             </Button>
          </form>
-         <div class="text-center mt-3 text-[10px] text-muted-foreground font-bold tracking-[0.2em] opacity-60">
-            SAGE INTELLIGENCE
+         <div class="text-center mt-3 text-[10px] text-muted-foreground/40 font-medium tracking-widest uppercase">
+            Sage Intelligence
          </div>
       </div>
     </div>

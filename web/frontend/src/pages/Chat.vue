@@ -5,6 +5,7 @@ import Sidebar from '@/components/chat/Sidebar.vue'
 import ChatHeader from '@/components/chat/ChatHeader.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import MessageList from '@/components/chat/MessageList.vue'
+import CanvasPanel from '@/components/chat/CanvasPanel.vue'
 
 // Mobile sidebar state
 const sidebarOpen = ref(false)
@@ -24,7 +25,9 @@ const {
   toastMessage, toastType, regenerateFromMessage,
   searchQuery, showSearch,
   uploadedImages, fileInputRef, MAX_IMAGES, triggerImageUpload,
-  handleImageSelect, removeImage, thinkingSeconds
+  handleImageSelect, removeImage, thinkingSeconds,
+  isCanvasOpen, canvasContent, canvasLanguage, closeCanvas,
+  isAgentMode, toggleAgentMode
 } = useChat()
 
 // Wrapper for loadSession to handle sidebar closing
@@ -107,6 +110,7 @@ const onFileSelected = (event: Event) => {
     <main :class="[
         'flex-1 flex flex-col min-w-0 relative transition-all duration-300 ease-in-out pt-14',
         isSidebarCollapsed ? 'md:ml-0' : 'md:ml-[280px]',
+        isCanvasOpen ? 'md:mr-[45vw]' : '',
         'bg-muted/10'
     ]">
       <!-- Background Decor (Hidden on mobile for performance) -->
@@ -119,8 +123,11 @@ const onFileSelected = (event: Event) => {
         :session-id="sessionId"
         :is-sidebar-collapsed="isSidebarCollapsed"
         :sidebar-open="sidebarOpen"
+        :is-canvas-open="isCanvasOpen"
+        :is-agent-mode="isAgentMode"
         @toggle-sidebar="toggleSidebar"
         @toggle-sidebar-desktop="toggleSidebarDesktop"
+        @toggle-agent-mode="toggleAgentMode"
       />
 
       <MessageList 
@@ -134,6 +141,7 @@ const onFileSelected = (event: Event) => {
         :copied-message-id="copiedMessageId"
         :max-images="MAX_IMAGES"
         :input="input"
+        v-model:is-agent-mode="isAgentMode"
         @update:input="input = $event"
         @submit="handleSubmit"
         @remove-image="removeImage"
@@ -154,6 +162,7 @@ const onFileSelected = (event: Event) => {
         :uploaded-images="uploadedImages"
         :status="status"
         :is-sidebar-collapsed="isSidebarCollapsed"
+        :is-canvas-open="isCanvasOpen"
         :max-images="MAX_IMAGES"
         @submit="handleSubmit"
         @stop="stopGeneration"
@@ -162,6 +171,13 @@ const onFileSelected = (event: Event) => {
         @file-selected="onFileSelected"
       />
     </main>
+
+    <CanvasPanel 
+        :is-open="isCanvasOpen"
+        :content="canvasContent"
+        :language="canvasLanguage"
+        @close="closeCanvas"
+    />
   </div>
 </template>
 

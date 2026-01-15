@@ -50,6 +50,12 @@ class BrowserPool:
                 "--mute-audio",
                 "--no-first-run",
                 "--disable-default-apps",
+                # 额外性能优化
+                "--disable-infobars",
+                "--disable-popup-blocking",
+                "--disable-notifications",
+                "--disable-logging",
+                "--log-level=3",
             ]
         )
     

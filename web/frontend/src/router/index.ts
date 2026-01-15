@@ -12,6 +12,12 @@ const routes = [
         path: '/stats',
         name: 'Stats',
         component: Stats
+    },
+    // Agent功能已合并到Chat页面，通过模式切换使用
+    {
+        path: '/agent',
+        name: 'Agent',
+        redirect: '/'  // 重定向到首页
     }
 ]
 
