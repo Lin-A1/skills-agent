@@ -5,10 +5,6 @@
 **基于 Skills 模式的智能 Agent 框架**  
 **An Intelligent Agent Framework Based on Skills Pattern**
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
-[![Vue](https://img.shields.io/badge/Vue-3.x-green.svg)](https://vuejs.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-teal.svg)](https://fastapi.tiangolo.com/)
-[![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://www.docker.com/)
 
 [English](#english) | [中文](#中文)
 
@@ -30,7 +26,7 @@ Sage 是一个基于 **Skills 模式** 的智能 Agent 框架，遵循 [Agent Sk
 
 #### 🎯 Skills Agent 架构设计
 
-这是本项目的**核心创新点**，采用了类似 Claude Code 的 Agentic 设计模式：
+这是本项目的**核心创新点**，采用了类似 Claude Code 的 SKILLS 设计模式：
 
 ##### 1. 技能自动发现 (Skill Auto-Discovery)
 
@@ -67,15 +63,16 @@ description: 基于 SearXNG 与 VLM 的实时联网搜索服务
 通过 SearXNG 搜索引擎获取网页结果，使用 VLM 进行智能分析...
 
 ## 调用方式
-```python
+\```python
 from services.websearch_service.client import WebSearchClient
 client = WebSearchClient()
 result = client.search("Python async编程", max_results=5)
-```
+\```
 
 ## 返回格式
+\```python
 { "query": "...", "results": [...] }
-```
+\```
 
 ##### 3. 沙盒隔离执行 (Sandbox Isolation)
 
@@ -342,11 +339,11 @@ description: Real-time web search service based on SearXNG and VLM
 Fetches web results through SearXNG, uses VLM for intelligent analysis...
 
 ## Usage
-```python
+\```python
 from services.websearch_service.client import WebSearchClient
 client = WebSearchClient()
 result = client.search("Python async programming", max_results=5)
-```
+\```
 ```
 
 ##### 3. Sandbox Isolation
